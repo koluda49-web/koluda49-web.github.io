@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Автопривязка платежей — инструкция</title>
+<style>
+  :root {
+    --bg: #FAF8F4;
+    --paper: #FFFFFF;
+    --ink: #1F2421;
+    --ink-soft: #5B6460;
+    --accent: #8B7FFF;
+    --accent-soft: #F3E8FF;
+    --accent-deep: #6B21A8;
+    --line: #E4E0D8;
+    --warn-bg: #FDF3E7;
+    --warn-line: #E8A33D;
+    --code-bg: #1F2421;
+    --code-ink: #E8F2EC;
+    --step-num-bg: #8B7FFF;
+    --radius: 14px;
+    --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
+  }
+
+  @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 24px 120px;
+  }
+
+  /* ---------- HERO ---------- */
+  .hero {
+    padding: 72px 0 40px;
+    border-bottom: 1px solid var(--line);
+  }
+  .hero .eyebrow {
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .hero .eyebrow .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent);
+    display: inline-block;
+  }
+  .hero h1 {
+    font-family: var(--serif);
+    font-weight: 700;
+    font-size: clamp(34px, 5vw, 48px);
+    line-height: 1.12;
+    margin: 0 0 18px;
+    letter-spacing: -0.01em;
+  }
+  .hero p.lead {
+    font-size: 18px;
+    color: var(--ink-soft);
+    max-width: 540px;
+    margin: 0 0 28px;
+  }
+
+  /* ---------- SECTION ---------- */
+  .section {
+    margin: 56px 0 0;
+    scroll-margin-top: 90px;
+  }
+  .section h2 {
+    font-family: var(--serif);
+    font-size: clamp(24px, 4vw, 32px);
+    font-weight: 700;
+    margin: 0 0 24px;
+    letter-spacing: -0.01em;
+  }
+  .section > p {
+    font-size: 16px;
+    margin: 0 0 20px;
+    max-width: 680px;
+  }
+
+  /* ---------- STEP ---------- */
+  .step {
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    gap: 18px;
+    margin-bottom: 24px;
+    align-items: start;
+  }
+  .step-num {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--step-num-bg);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .step-body {
+    padding-top: 4px;
+  }
+  .step-body h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 10px;
+    color: var(--ink);
+  }
+  .step-body p {
+    font-size: 15px;
+    margin: 0 0 12px;
+    color: var(--ink-soft);
+  }
+  .step-body p:last-child {
+    margin-bottom: 0;
+  }
+  .step-body ul, .step-body ol {
+    margin: 12px 0;
+    padding-left: 20px;
+    font-size: 15px;
+  }
+  .step-body li {
+    margin-bottom: 6px;
+    color: var(--ink-soft);
+  }
+
+  /* ---------- CODE BLOCK ---------- */
+  pre {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    padding: 16px;
+    border-radius: var(--radius);
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 12px 0 20px;
+  }
+  code {
+    font-family: var(--mono);
+    background: rgba(31, 36, 33, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: var(--accent-deep);
+  }
+
+  /* ---------- TABLE ---------- */
+  .ref {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 20px;
+    font-size: 14px;
+  }
+  .ref th {
+    background: var(--accent-soft);
+    color: var(--accent-deep);
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+    border: 1px solid var(--line);
+  }
+  .ref td {
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    color: var(--ink-soft);
+  }
+  .ref code {
+    background: transparent;
+    color: var(--accent-deep);
+  }
+
+  /* ---------- WARNING BOX ---------- */
+  .warn {
+    background: var(--warn-bg);
+    border-left: 3px solid var(--warn-line);
+    padding: 14px 16px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    margin: 20px 0;
+    font-size: 14px;
+    color: var(--ink);
+  }
+  .warn strong {
+    color: var(--ink);
+  }
+
+  /* ---------- DOWNLOAD BUTTONS ---------- */
+  .btn-group {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 20px 0;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: var(--accent-soft);
+    color: var(--accent-deep);
+    text-decoration: none;
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--accent);
+    transition: background 0.2s;
+  }
+  .btn:hover {
+    background: var(--accent);
+    color: white;
+  }
+
+  /* ---------- NAV ---------- */
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 32px;
+    transition: color 0.2s;
+  }
+  .back-link:hover {
+    color: var(--accent-deep);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <a href="/" class="back-link">← Вернуться на главную</a>
+
+  <div class="hero">
+    <div class="eyebrow"><span class="dot"></span>Платежи</div>
+    <h1>Автопривязка платежей: Google Таблица → CRM</h1>
+    <p class="lead">Синхронизируйте статус платежей из Google Таблицы со своей CRM за несколько кликов. Два компонента: Google Apps Script для чтения таблицы и Tampermonkey-скрипт для заполнения платежей в CRM.</p>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- ФАЙЛЫ -->
+  <!-- ============================================================ -->
+  <div class="section">
+    <h2>Файлы для установки</h2>
+    <p>Вам нужны три файла:</p>
+    
+    <div class="ref" style="font-size: 15px; margin: 16px 0;">
+      <tr>
+        <th>Файл</th>
+        <th>Назначение</th>
+      </tr>
+      <tr>
+        <td><code>AppsScript_Code.gs</code></td>
+        <td>Код для Google Apps Script (читает таблицу, предоставляет данные браузеру)</td>
+      </tr>
+      <tr>
+        <td><code>zikmes_payments.user.js</code></td>
+        <td>Tampermonkey-скрипт (добавляет кнопку в браузер, обновляет платежи в CRM)</td>
+      </tr>
+    </div>
+
+    <div class="btn-group">
+      <a href="https://raw.githubusercontent.com/koluda49-web/koluda49-web.github.io/main/AppsScript_Code.gs" download="AppsScript_Code.gs" class="btn">⬇ AppsScript_Code.gs</a>
+      <a href="https://raw.githubusercontent.com/koluda49-web/koluda49-web.github.io/main/zikmes_payments.user.js" download="zikmes_payments.user.js" class="btn">⬇ zikmes_payments.user.js</a>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- ЧАСТЬ 1 -->
+  <!-- ============================================================ -->
+  <div class="section">
+    <h2>Часть 1. Настройка Google Apps Script</h2>
+    
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <h3>Откройте Google Таблицу</h3>
+        <p>Зайдите в таблицу <strong>«Оплаты Зикмес»</strong> и откройте меню <strong>Расширения → Apps Script</strong>.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <h3>Замените код</h3>
+        <p>Удалите весь код-заглушку (<code>function myFunction() {...}</code>), скопируйте содержимое файла <code>AppsScript_Code.gs</code> и вставьте его в редактор.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <h3>Сохраните проект</h3>
+        <p>Нажмите значок <strong>дискеты</strong> или Ctrl+S.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <h3>Разверните как Web App</h3>
+        <p>Нажмите кнопку <strong>«Развернуть»</strong> (Deploy) в правом верхнем углу → <strong>«Новое развертывание»</strong>.</p>
+        <p>Рядом с «Тип развертывания» нажмите шестерёнку ⚙️ → выберите <strong>«Веб-приложение»</strong>.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <h3>Заполните параметры</h3>
+        <ul>
+          <li><strong>Описание:</strong> например <code>v1</code></li>
+          <li><strong>Выполнять как:</strong> выберите <strong>Я (ваш аккаунт)</strong></li>
+          <li><strong>У кого есть доступ:</strong> выберите <strong>Все</strong> (важно!)</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">6</div>
+      <div class="step-body">
+        <h3>Получите URL</h3>
+        <p>Нажмите <strong>«Развернуть»</strong>. Google спросит разрешение — нажмите <strong>«Разрешить»</strong>.</p>
+        <p>После развёртывания появится окно с <strong>URL веб-приложения</strong>. Он выглядит как:</p>
+        <pre>https://script.google.com/macros/s/AKfycby.../exec</pre>
+        <p><strong>Скопируйте этот URL</strong> — он понадобится в Части 2.</p>
+      </div>
+    </div>
+
+    <div class="warn">
+      <strong>⚠️ Важно:</strong> если вы будете менять код <code>.gs</code> файла в будущем, не создавайте новое развертывание — обновляйте существующее через <strong>«Управление развертываниями»</strong>, выбрав <strong>«Новая версия»</strong>. Это сохранит URL прежним.
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- ЧАСТЬ 2 -->
+  <!-- ============================================================ -->
+  <div class="section">
+    <h2>Часть 2. Настройка Tampermonkey</h2>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <h3>Установите Tampermonkey</h3>
+        <p>Если расширения нет — установите <strong>Tampermonkey</strong> из официального магазина расширений вашего браузера (Chrome Web Store, Microsoft Edge Add-ons и т.д.).</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <h3>Разрешите пользовательские скрипты (важно!)</h3>
+        <p>Откройте <code>chrome://extensions/</code> → найдите Tampermonkey → нажмите <strong>«Подробнее»</strong> → пролистайте и включите переключатель <strong>«Разрешить пользовательские скрипты»</strong>.</p>
+        <p>Без этого Chrome блокирует выполнение скриптов, и кнопка не появится в CRM.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <h3>Создайте новый скрипт</h3>
+        <p>Откройте панель Tampermonkey → нажмите <strong>«Создать новый скрипт»</strong> (значок ➕).</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <h3>Вставьте код</h3>
+        <p>Удалите весь код-заглушку, скопируйте содержимое файла <code>zikmes_payments.user.js</code> и вставьте в редактор.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <h3>Вставьте URL веб-приложения</h3>
+        <p>Найдите строку в коде:</p>
+        <pre>const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/ВАШ_ID_РАЗВЕРТЫВАНИЯ/exec';</pre>
+        <p>Замените <code>https://script.google.com/macros/s/ВАШ_ID_РАЗВЕРТЫВАНИЯ/exec</code> на URL, который вы скопировали в Части 1, шаг 6.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">6</div>
+      <div class="step-body">
+        <h3>Сохраните скрипт</h3>
+        <p>Нажмите Ctrl+S или значок дискеты.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- ЧАСТЬ 3 -->
+  <!-- ============================================================ -->
+  <div class="section">
+    <h2>Часть 3. Использование</h2>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <h3>Откройте CRM</h3>
+        <p>Зайдите на любую страницу <strong>a.ok-crm.com</strong> (например, главный экран или список заказов), будучи залогинены через Google как обычно.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <h3>Нажмите кнопку</h3>
+        <p>В правом нижнем углу экрана появится зелёная кнопка <strong>«💳 Привязать платежи из таблицы»</strong>.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <h3>Следите за логом</h3>
+        <p>Нажмите кнопку — откроется панель с логом обработки. Скрипт автоматически:</p>
+        <ul>
+          <li>получит список необработанных строк из таблицы (фильтр: статус пустой, сумма ≥ 5),</li>
+          <li>для каждого заказа найдёт платёж со статусом <strong>«Ожидает оплаты»</strong> или <strong>«Просрочен»</strong>,</li>
+          <li>заполнит сумму, метод оплаты, дату и поставит статус <strong>«Оплачен»</strong>,</li>
+          <li>отметит строку в таблице как <strong>«Обработан»</strong>.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <h3>Результаты</h3>
+        <p>В конце увидите итог: «обработано N, ошибок M, не найдено платежей K».</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- ВАЖНЫЕ ОГРАНИЧЕНИЯ -->
+  <!-- ============================================================ -->
+  <div class="section">
+    <h2>Важные ограничения</h2>
+
+    <div class="step">
+      <div class="step-num">!</div>
+      <div class="step-body">
+        <h3>Активный лист таблицы</h3>
+        <p>Скрипт смотрит только тот лист, который открыт как активный в Google Таблице на момент нажатия кнопки. Если нужно обработать другой месяц — откройте соответствующий лист перед запуском.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">!</div>
+      <div class="step-body">
+        <h3>Минимальная сумма</h3>
+        <p>Строки с суммой меньше 5 рублей автоматически пропускаются.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">!</div>
+      <div class="step-body">
+        <h3>Подходящие статусы платежа</h3>
+        <p>Скрипт ищет платёж со статусом <strong>«Ожидает оплаты»</strong> или <strong>«Просрочен»</strong> — первый найденный по порядку.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">!</div>
+      <div class="step-body">
+        <h3>Один платёж на заказ</h3>
+        <p>Предполагается, что к одному ID заказа указана одна сумма. Если в заказе несколько подходящих платежей, скрипт возьмёт первый.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">!</div>
+      <div class="step-body">
+        <h3>CSRF-токен и сессия</h3>
+        <p>Скрипт получает свежий токен перед каждым сохранением, поэтому вы должны быть залогинены в CRM в этом браузере.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">!</div>
+      <div class="step-body">
+        <h3>Скорость обработки</h3>
+        <p>Между обработкой заказов есть пауза 0.5 сек. Обработка 20–30 заказов займёт примерно 15–30 секунд.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">!</div>
+      <div class="step-body">
+        <h3>После обновления кода</h3>
+        <p>Если вы менили код <code>.gs</code> файла, проверьте, что URL веб-приложения не изменился, и что в Tampermonkey-скрипте стоит актуальный URL.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- TROUBLESHOOTING -->
+  <!-- ============================================================ -->
+  <div class="section">
+    <h2>Если что-то не работает</h2>
+
+    <p>Если при нажатии кнопки видите ошибку вроде <strong>"Failed to fetch"</strong> или <strong>"CORS"</strong> — откройте консоль браузера (F12 → Console) на странице CRM и посмотрите текст ошибки.</p>
+
+    <p>Самые частые причины:</p>
+    <ul style="margin-left: 20px; color: var(--ink-soft);">
+      <li><strong>Кнопка не появляется:</strong> не включена опция «Разрешить пользовательские скрипты» для Tampermonkey в <code>chrome://extensions/</code></li>
+      <li><strong>«Failed to fetch»:</strong> неправильный URL веб-приложения в <code>const APPS_SCRIPT_URL</code></li>
+      <li><strong>«CORS» ошибка:</strong> убедитесь, что при развертывании выбрали <strong>«У кого есть доступ: Все»</strong></li>
+      <li><strong>Ошибка при чтении таблицы:</strong> убедитесь, что Google Таблица открыта и имеет правильное имя (ищет лист по названию)</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>
