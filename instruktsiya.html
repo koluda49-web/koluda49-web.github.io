@@ -247,6 +247,51 @@
   .doc-link:hover { background: #e3ecf7; }
   .doc-link::before { content: '📄'; }
 
+  /* FEATURED LINK (highlighted instruction block) */
+  .featured-link-box {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 16px;
+    background: linear-gradient(135deg, #fff8ea 0%, #fdf0d5 100%);
+    border: 1.5px solid var(--gold);
+    border-radius: 10px;
+    padding: 14px 18px;
+  }
+  .featured-link-box .flb-icon {
+    font-size: 26px;
+    flex-shrink: 0;
+  }
+  .featured-link-box .flb-text {
+    flex: 1;
+  }
+  .featured-link-box .flb-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #9a6b00;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+  .featured-link-box .flb-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--navy);
+  }
+  .featured-link-box .flb-btn {
+    flex-shrink: 0;
+    background: var(--gold);
+    color: var(--white);
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 9px 16px;
+    border-radius: 6px;
+    transition: background 0.2s;
+    white-space: nowrap;
+  }
+  .featured-link-box .flb-btn:hover { background: var(--gold-light); }
+
   /* DIVIDER */
   .divider {
     height: 1px;
@@ -767,7 +812,14 @@
     </div>
 
     <div class="subsection">
-      <a class="doc-link" href="https://drive.google.com/drive/u/3/folders/1bEP741LotU20oqLnA4zMH5Hhu-V15iEd" target="_blank">Инструкция по рассрочке и кредитам — Google Drive</a>
+      <div class="featured-link-box">
+        <div class="flb-icon">💳</div>
+        <div class="flb-text">
+          <div class="flb-label">Важная инструкция</div>
+          <div class="flb-title">Инструкция по рассрочке и кредитам</div>
+        </div>
+        <a class="flb-btn" href="https://drive.google.com/drive/u/3/folders/1bEP741LotU20oqLnA4zMH5Hhu-V15iEd" target="_blank">Открыть →</a>
+      </div>
     </div>
   </div>
 
