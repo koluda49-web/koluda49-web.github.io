@@ -19,7 +19,7 @@
   var APPS_SCRIPT_TOKEN = 'shtenli1';
 
   var TELEGRAM_BOT_TOKEN = '8864410133:AAFMh0pWwS5POriOVMGYEYAbcG2FjTinIjg';
-  var TELEGRAM_CHAT_ID = '308245897';
+  var TELEGRAM_CHAT_IDS = ['308245897', '722497853'];
 
   var CRM_LIST_URL_TEMPLATE =
     'https://a.ok-crm.com/order/index?OrderSearch%5Bid%5D={id}' +
@@ -177,20 +177,45 @@
     return false;
   }
 
-  function sendTelegramMessage(text) {
+  function sendToOneChatId(chatId, text) {
     return new Promise(function (resolve, reject) {
       var url = 'https://api.telegram.org/bot' + TELEGRAM_BOT_TOKEN + '/sendMessage';
       GM_xmlhttpRequest({
         method: 'POST',
         url: url,
         headers: { 'Content-Type': 'application/json' },
-        data: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: text }),
+        data: JSON.stringify({ chat_id: chatId, text: text }),
         onload: function (response) {
-          if (response.status === 200) { resolve(); } else { reject(new Error('Telegram HTTP ' + response.status)); }
+          if (response.status === 200) { resolve(); } else { reject(new Error('Telegram HTTP ' + response.status + ' for chat ' + chatId)); }
         },
         onerror: function (err) { reject(err); }
       });
     });
+  }
+
+  function sendTelegramMessage(text) {
+    var i = 0;
+    var failures = [];
+
+    function next() {
+      if (i >= TELEGRAM_CHAT_IDS.length) {
+        if (failures.length > 0) {
+          return Promise.reject(new Error('Failed for chat IDs: ' + failures.join(', ')));
+        }
+        return Promise.resolve();
+      }
+      var chatId = TELEGRAM_CHAT_IDS[i];
+      i++;
+      return sendToOneChatId(chatId, text).then(function () {
+        return next();
+      }).catch(function (e) {
+        log('Failed to send to chat ' + chatId + ':', e);
+        failures.push(chatId);
+        return next();
+      });
+    }
+
+    return next();
   }
 
   function flushPendingNotifications() {
