@@ -407,6 +407,110 @@ function undoDone(id){const st={...sharedState};st[id]={...st[id],done:false,don
 
 function openManualTime(id){const cur=sharedState[id]||{};const m=cur.elapsed?Math.floor(cur.elapsed/60000):0;const val=prompt('Затраченное время (ч:мм):',Math.floor(m/60)+':'+String(m%60).padStart(2,'0'));if(val===null)return;const p=val.trim().split(':');let ms=p.length===2?(parseInt(p[0])||0)*3600000+(parseInt(p[1])||0)*60000:(parseInt(p[0])||0)*60000;const st={...sharedState};st[id]={...cur,elapsed:Math.max(0,ms),running:false,runStart:null};saveState(st);renderTasks();}
 
+function openCalendar(taskId){
+  const cur=sharedState[taskId]||{};
+  const d=cur.doneAt?new Date(cur.doneAt):new Date();
+  let currentMonth=d.getMonth();
+  let currentYear=d.getFullYear();
+  
+  const modal=document.createElement('div');
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:10000;';
+  
+  const cal=document.createElement('div');
+  cal.style.cssText='background:#13132a;border:1px solid rgba(139,127,255,.3);border-radius:16px;padding:20px;width:100%;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,.5);';
+  
+  const monthNames=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  
+  function renderCal(){
+    cal.innerHTML='';
+    
+    const header=document.createElement('div');
+    header.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;';
+    
+    const prevBtn=document.createElement('button');
+    prevBtn.textContent='←';
+    prevBtn.style.cssText='background:transparent;border:none;color:#c4b5fd;font-size:18px;cursor:pointer;';
+    prevBtn.onclick=()=>{currentMonth--;if(currentMonth<0){currentMonth=11;currentYear--;}renderCal();};
+    
+    const title=document.createElement('div');
+    title.textContent=monthNames[currentMonth]+' '+currentYear;
+    title.style.cssText='font-weight:600;color:#fff;font-size:16px;';
+    
+    const nextBtn=document.createElement('button');
+    nextBtn.textContent='→';
+    nextBtn.style.cssText='background:transparent;border:none;color:#c4b5fd;font-size:18px;cursor:pointer;';
+    nextBtn.onclick=()=>{currentMonth++;if(currentMonth>11){currentMonth=0;currentYear++;}renderCal();};
+    
+    header.appendChild(prevBtn);
+    header.appendChild(title);
+    header.appendChild(nextBtn);
+    cal.appendChild(header);
+    
+    const daysHeader=document.createElement('div');
+    daysHeader.style.cssText='display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:8px;';
+    ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].forEach(day=>{
+      const el=document.createElement('div');
+      el.textContent=day;
+      el.style.cssText='text-align:center;font-size:12px;color:rgba(255,255,255,.5);padding:4px;font-weight:600;';
+      daysHeader.appendChild(el);
+    });
+    cal.appendChild(daysHeader);
+    
+    const grid=document.createElement('div');
+    grid.style.cssText='display:grid;grid-template-columns:repeat(7,1fr);gap:4px;';
+    
+    const firstDay=new Date(currentYear,currentMonth,1);
+    const lastDay=new Date(currentYear,currentMonth+1,0);
+    const startDay=(firstDay.getDay()+6)%7;
+    
+    for(let i=0;i<startDay;i++){
+      const empty=document.createElement('div');
+      grid.appendChild(empty);
+    }
+    
+    for(let day=1;day<=lastDay.getDate();day++){
+      const dayEl=document.createElement('button');
+      dayEl.textContent=day;
+      const isSelected=d.getDate()===day&&d.getMonth()===currentMonth&&d.getFullYear()===currentYear;
+      dayEl.style.cssText=`
+        padding:8px;
+        border-radius:8px;
+        border:1px solid ${isSelected?'#8b7fff':'rgba(255,255,255,.1)'};
+        background:${isSelected?'#8b7fff':'transparent'};
+        color:${isSelected?'#fff':'#c4b5fd'};
+        cursor:pointer;
+        font-size:13px;
+        font-weight:500;
+        transition:all .2s;
+      `;
+      dayEl.onmouseover=()=>dayEl.style.background='rgba(139,127,255,.2)';
+      dayEl.onmouseout=()=>{if(!isSelected)dayEl.style.background='transparent';};
+      dayEl.onclick=()=>{
+        const selectedDate=new Date(currentYear,currentMonth,day,d.getHours(),d.getMinutes(),0);
+        const st={...sharedState};
+        st[taskId]={...cur,doneAt:selectedDate.getTime()};
+        saveState(st);
+        renderTasks();
+        modal.remove();
+      };
+      grid.appendChild(dayEl);
+    }
+    
+    cal.appendChild(grid);
+    
+    const closeBtn=document.createElement('button');
+    closeBtn.textContent='Закрыть';
+    closeBtn.style.cssText='width:100%;margin-top:16px;padding:10px;border-radius:8px;border:1px solid rgba(139,127,255,.3);background:transparent;color:#c4b5fd;cursor:pointer;font-size:14px;font-weight:500;';
+    closeBtn.onclick=()=>modal.remove();
+    cal.appendChild(closeBtn);
+  }
+  
+  renderCal();
+  modal.appendChild(cal);
+  modal.onclick=e=>{if(e.target===modal)modal.remove();};
+  document.body.appendChild(modal);
+}
+
 function addTask(){const inp=document.getElementById('new-task-input');const title=inp.value.trim();if(!title)return;const id='c_'+Date.now();customTasks.push({id,title,icon:'📝'});saveLocal();sheetUpdate({action:'add',id,title,icon:'📝'});inp.value='';renderTasks();}
 
 function deleteTask(id){customTasks=customTasks.filter(t=>t.id!==id);const st={...sharedState};delete st[id];sharedState=st;saveLocal();sheetUpdate({action:'delete',id});renderTasks();}
@@ -448,7 +552,7 @@ function makeCard(t,isCustom){
   } else {
     if(s.doneAt){const m=document.createElement('span');m.className='task-meta';m.textContent='✅ Закрыто: '+fmtTime(s.doneAt);row.appendChild(m);}
     const eb=document.createElement('button');eb.className='small-btn btn-manual';eb.textContent='✏️';eb.onclick=()=>openManualTime(t.id);row.appendChild(eb);
-    const dateBtn=document.createElement('button');dateBtn.className='small-btn btn-manual';dateBtn.textContent='📅';dateBtn.onclick=()=>{const cur=sharedState[t.id]||{};const d=cur.doneAt?new Date(cur.doneAt):new Date();const pad=n=>String(n).padStart(2,'0');const def=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());const val=prompt('Изменить дату закрытия:',def);if(val===null)return;const ts=new Date(val).getTime();if(!isNaN(ts)){const st={...sharedState};st[t.id]={...cur,doneAt:ts};saveState(st);renderTasks();}};row.appendChild(dateBtn);
+    const dateBtn=document.createElement('button');dateBtn.className='small-btn btn-manual';dateBtn.textContent='📅';dateBtn.onclick=()=>openCalendar(t.id);row.appendChild(dateBtn);
     const ub=document.createElement('button');ub.className='small-btn btn-undo';ub.textContent='Отменить';ub.onclick=()=>undoDone(t.id);row.appendChild(ub);
   }
   card.appendChild(row);
