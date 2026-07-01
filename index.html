@@ -349,25 +349,13 @@ async function sheetUpdate(payload){
 
 async function syncDown(){
   try{
-    const r = await fetch('https://docs.google.com/spreadsheets/d/1EH1z-9RTYfS-anpojTaM-GjObnZST6XiXQreZ5r2cCk/gviz/tq?tqx=out:csv&sheet=tasks&t='+Date.now());
+    const r = await fetch('https://script.google.com/macros/s/AKfycbxab8T3CKFX0XfHkj85eAurRDt1IVTaVDMkflvosZ60e7yzPRUnof5CIC3OlcPDoyEKdA/exec?callback=window._handleSync');
     if(!r.ok) return;
     const text = await r.text();
-    // Simple CSV parser
-    const lines = text.trim().split(/\r?\n/);
-    const headers = lines[0].split(',').map(h=>h.replace(/^"|"$/g,'').trim());
-    const rows = lines.slice(1).filter(l=>l.trim()).map(line=>{
-      const vals=[]; let cur='', inQ=false;
-      for(let i=0;i<line.length;i++){
-        if(line[i]==='"'){inQ=!inQ;}
-        else if(line[i]===','&&!inQ){vals.push(cur.trim());cur='';}
-        else cur+=line[i];
-      }
-      vals.push(cur.trim());
-      const obj={};
-      headers.forEach((h,i)=>obj[h]=(vals[i]||'').replace(/^"|"$/g,'').trim());
-      return obj;
-    });
-    const data = {tasks: rows};
+    // Extract JSON from JSONP callback
+    const match = text.match(/window\._handleSync\((.*)\)/);
+    if(!match) return;
+    const data = JSON.parse(match[1]);
     if(!data||!data.tasks)return;
     const newState={}, newCustom=[], sheetTasks=[];
     data.tasks.forEach(row=>{
@@ -376,7 +364,21 @@ async function syncDown(){
       const isDone = status==='сделана'||status==='true';
       const inWork = status==='в работе';
       const hours = parseFloat(row.elapsed)||0;
-      newState[id]={done:isDone, inWork, status:row.status||'', doneAt:row.doneAt?new Date(row.doneAt).getTime():null, elapsed:Math.round(hours*3600000)};
+      let doneAtTs = null;
+      if(row.doneAt && row.doneAt.trim()){
+        // Try to parse DD.MM.YYYY format
+        const dateStr = row.doneAt.trim();
+        let parsedDate;
+        if(/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(dateStr)){
+          const [day, month, year] = dateStr.split('.');
+          parsedDate = new Date(year, month-1, day);
+        }else{
+          // Fallback to standard date parsing
+          parsedDate = new Date(dateStr);
+        }
+        if(!isNaN(parsedDate.getTime())) doneAtTs = parsedDate.getTime();
+      }
+      newState[id]={done:isDone, inWork, status:row.status||'', doneAt:doneAtTs, elapsed:Math.round(hours*3600000)};
       // Build task list from sheet (all tasks)
       sheetTasks.push({id, title:row.title||'', icon:row.icon||'📝'});
     });
@@ -386,6 +388,7 @@ async function syncDown(){
     const el=document.getElementById('sync-indicator');
     if(el)el.textContent='✓ обновлено '+new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
   }catch(e){
+    console.log('Sync error:',e);
     const el=document.getElementById('sync-indicator');
     if(el)el.textContent='⚠️ нет связи';
   }
@@ -552,7 +555,6 @@ function makeCard(t,isCustom){
   } else {
     if(s.doneAt){const m=document.createElement('span');m.className='task-meta';m.textContent='✅ Закрыто: '+fmtTime(s.doneAt);row.appendChild(m);}
     const eb=document.createElement('button');eb.className='small-btn btn-manual';eb.textContent='✏️';eb.onclick=()=>openManualTime(t.id);row.appendChild(eb);
-    const dateBtn=document.createElement('button');dateBtn.className='small-btn btn-manual';dateBtn.textContent='📅';dateBtn.onclick=()=>openCalendar(t.id);row.appendChild(dateBtn);
     const ub=document.createElement('button');ub.className='small-btn btn-undo';ub.textContent='Отменить';ub.onclick=()=>undoDone(t.id);row.appendChild(ub);
   }
   card.appendChild(row);
