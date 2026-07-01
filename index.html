@@ -352,9 +352,16 @@ async function syncDown(){
     const r = await fetch('https://script.google.com/macros/s/AKfycbxab8T3CKFX0XfHkj85eAurRDt1IVTaVDMkflvosZ60e7yzPRUnof5CIC3OlcPDoyEKdA/exec');
     if(!r.ok) return;
     const text = await r.text();
-    const match = text.match(/window\._handleSync\((.*)\)/);
-    if(!match) return;
-    const data = JSON.parse(match[1]);
+    
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch(e) {
+      const match = text.match(/\{.*\}/);
+      if(!match) return;
+      data = JSON.parse(match[0]);
+    }
+    
     if(!data||!data.tasks)return;
     const newState={}, sheetTasks=[];
     const monthTotals = {};
@@ -380,7 +387,6 @@ async function syncDown(){
       newState[id]={done:isDone, inWork:false, status:row.status||'', doneAt:doneAtTs, elapsed:Math.round(hours*3600000)};
       sheetTasks.push({id, title:row.title||'', icon:row.icon||'📝'});
       
-      // Собираем месячные итоги из столбца monthTotal
       if(isDone && doneAtTs && row.monthTotal){
         const date = new Date(doneAtTs);
         const monthKey = date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0');
