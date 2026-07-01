@@ -563,7 +563,7 @@ function makeCard(t,isCustom){
 }
 
 function renderTasks(){
-  const all = window._sheetTasks && window._sheetTasks.length ? window._sheetTasks : [...DEFAULT_TASKS,...customTasks];
+  const all = window._sheetTasks && window._sheetTasks.length ? window._sheetTasks : [];
   const pending=all.filter(t=>!(sharedState[t.id]||{}).done);
   const done=all.filter(t=>!!(sharedState[t.id]||{}).done);
   const list=document.getElementById('task-list');if(!list)return;
