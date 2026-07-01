@@ -349,49 +349,54 @@ async function sheetUpdate(payload){
 
 async function syncDown(){
   try{
-    const r = await fetch('https://script.google.com/macros/s/AKfycbxab8T3CKFX0XfHkj85eAurRDt1IVTaVDMkflvosZ60e7yzPRUnof5CIC3OlcPDoyEKdA/exec?callback=window._handleSync');
+    const r = await fetch('https://script.google.com/macros/s/AKfycbxab8T3CKFX0XfHkj85eAurRDt1IVTaVDMkflvosZ60e7yzPRUnof5CIC3OlcPDoyEKdA/exec');
     if(!r.ok) return;
     const text = await r.text();
-    // Extract JSON from JSONP callback
     const match = text.match(/window\._handleSync\((.*)\)/);
     if(!match) return;
     const data = JSON.parse(match[1]);
     if(!data||!data.tasks)return;
-    const newState={}, newCustom=[], sheetTasks=[];
+    const newState={}, sheetTasks=[];
+    const monthTotals = {};
+    
     data.tasks.forEach(row=>{
       const id=row.id; if(!id)return;
       const status = String(row.status||row.done||'').toLowerCase();
       const isDone = status==='сделана'||status==='true';
-      const inWork = status==='в работе';
       const hours = parseFloat(row.elapsed)||0;
       let doneAtTs = null;
       if(row.doneAt && row.doneAt.trim()){
-        // Try to parse DD.MM.YYYY format
         const dateStr = row.doneAt.trim();
         let parsedDate;
         if(/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(dateStr)){
           const [day, month, year] = dateStr.split('.');
           parsedDate = new Date(year, month-1, day);
         }else{
-          // Fallback to standard date parsing
           parsedDate = new Date(dateStr);
         }
         if(!isNaN(parsedDate.getTime())) doneAtTs = parsedDate.getTime();
       }
-      newState[id]={done:isDone, inWork, status:row.status||'', doneAt:doneAtTs, elapsed:Math.round(hours*3600000)};
-      // Build task list from sheet (all tasks)
+      
+      newState[id]={done:isDone, inWork:false, status:row.status||'', doneAt:doneAtTs, elapsed:Math.round(hours*3600000)};
       sheetTasks.push({id, title:row.title||'', icon:row.icon||'📝'});
+      
+      // Собираем месячные итоги из столбца monthTotal
+      if(isDone && doneAtTs && row.monthTotal){
+        const date = new Date(doneAtTs);
+        const monthKey = date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0');
+        monthTotals[monthKey] = parseFloat(row.monthTotal) || 0;
+      }
     });
-    // Store sheet tasks globally
+    
     window._sheetTasks = sheetTasks;
-    window._monthTotals = data.monthTotals || {};
+    window._monthTotals = monthTotals;
     sharedState=newState; saveLocal(); renderTasks();
     const el=document.getElementById('sync-indicator');
-    if(el)el.textContent='✓ обновлено '+new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+    if(el)el.textContent='✓ '+new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
   }catch(e){
     console.log('Sync error:',e);
     const el=document.getElementById('sync-indicator');
-    if(el)el.textContent='⚠️ нет связи';
+    if(el)el.textContent='⚠️';
   }
 }
 
