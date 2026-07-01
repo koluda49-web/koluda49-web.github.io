@@ -564,54 +564,47 @@ function makeCard(t,isCustom){
 
 function renderTasks(){
   const all = window._sheetTasks && window._sheetTasks.length ? window._sheetTasks : [];
-  const pending=all.filter(t=>!(sharedState[t.id]||{}).done);
-  const done=all.filter(t=>!!(sharedState[t.id]||{}).done && (sharedState[t.id]||{}).elapsed > 0);
+  const done=all.filter(t=>{
+    const state = sharedState[t.id] || {};
+    return state.done && state.elapsed > 0;
+  });
   const list=document.getElementById('task-list');if(!list)return;
   list.innerHTML='';
 
+  // Only show completed tab
   const tabBar=document.createElement('div');tabBar.className='tab-bar';
-  [{label:'📋 Задачи',key:'pending',count:pending.length,bg:'#8b7fff',c:'#fff'},{label:'✅ Выполненные',key:'done',count:done.length,bg:'#34d399',c:'#0a0a12'}].forEach(({label,key,count,bg,c})=>{
-    const btn=document.createElement('button');btn.className='sub-tab';btn.textContent=label+' ('+count+')';
-    const active=taskTab===key;btn.style.cssText=`background:${active?bg:'rgba(255,255,255,.07)'};color:${active?c:'rgba(255,255,255,.4)'};`;
-    btn.onclick=()=>{taskTab=key;renderTasks();};tabBar.appendChild(btn);
-  });
-  const si=document.createElement('div');si.id='sync-indicator';si.style.cssText='margin-left:auto;font-size:11px;color:rgba(255,255,255,.25);';si.textContent='🔄 синхронизация...';tabBar.appendChild(si);
+  const btn=document.createElement('button');btn.className='sub-tab';btn.textContent='✅ Выполненные ('+done.length+')';
+  btn.style.cssText=`background:#34d399;color:#0a0a12;`;
+  tabBar.appendChild(btn);
+  const si=document.createElement('div');si.id='sync-indicator';si.style.cssText='margin-left:auto;font-size:11px;color:rgba(255,255,255,.25);';si.textContent='✓';tabBar.appendChild(si);
   list.appendChild(tabBar);
 
-  if(taskTab==='pending'){
-    const items=pending;
-    if(!items.length){const e=document.createElement('div');e.style.cssText='text-align:center;color:rgba(255,255,255,.25);font-size:14px;padding:40px 0;';e.textContent='Все задачи выполнены 🎉';list.appendChild(e);}
-    else items.forEach(t=>list.appendChild(makeCard(t,String(t.id).startsWith('c_'))));
+  if(!done.length){
+    const e=document.createElement('div');e.style.cssText='text-align:center;color:rgba(255,255,255,.25);font-size:14px;padding:40px 0;';
+    e.textContent='Пока нет выполненных задач';
+    list.appendChild(e);
   }else{
-    if(!done.length){const e=document.createElement('div');e.style.cssText='text-align:center;color:rgba(255,255,255,.25);font-size:14px;padding:40px 0;';e.textContent='Пока нет выполненных задач';list.appendChild(e);}
-    else{
-      const monthGroups={};
-      done.forEach(t=>{
-        const doneAt=sharedState[t.id]&&sharedState[t.id].doneAt?new Date(sharedState[t.id].doneAt):new Date();
-        const monthKey=doneAt.getFullYear()+'-'+String(doneAt.getMonth()+1).padStart(2,'0');
-        if(!monthGroups[monthKey])monthGroups[monthKey]=[];
-        monthGroups[monthKey].push(t);
-      });
-      const sortedMonths=Object.keys(monthGroups).sort().reverse();
-      sortedMonths.forEach(monthKey=>{
-        const [year,month]=monthKey.split('-');
-        const monthName=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][parseInt(month)-1];
-        const totalHours = (window._monthTotals && window._monthTotals[monthKey]) || 0;
-        const hoursText = totalHours > 0 ? ` — ${totalHours.toFixed(1)} ч` : '';
-        const header=document.createElement('div');header.style.cssText='font-size:16px;font-weight:600;color:#c4b5fd;margin-top:20px;margin-bottom:12px;padding-top:12px;border-top:1px solid rgba(139,127,255,.2);display:flex;justify-content:space-between;align-items:center;';
-        const title = document.createElement('span');
-        title.textContent=monthName+' '+year;
-        header.appendChild(title);
-        if(hoursText){
-          const hours = document.createElement('span');
-          hours.textContent = hoursText;
-          hours.style.cssText = 'font-size:14px;color:rgba(196,181,253,.7);font-weight:500;';
-          header.appendChild(hours);
-        }
-        list.appendChild(header);
-        monthGroups[monthKey].forEach(t=>list.appendChild(makeCard(t,String(t.id).startsWith('c_'))));
-      });
-    }
+    const monthGroups={};
+    done.forEach(t=>{
+      const doneAt=sharedState[t.id]&&sharedState[t.id].doneAt?new Date(sharedState[t.id].doneAt):new Date();
+      const monthKey=doneAt.getFullYear()+'-'+String(doneAt.getMonth()+1).padStart(2,'0');
+      if(!monthGroups[monthKey])monthGroups[monthKey]=[];
+      monthGroups[monthKey].push(t);
+    });
+    const sortedMonths=Object.keys(monthGroups).sort().reverse();
+    sortedMonths.forEach(monthKey=>{
+      const [year,month]=monthKey.split('-');
+      const monthName=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][parseInt(month)-1];
+      const totalHours = (window._monthTotals && window._monthTotals[monthKey]) || 0;
+      const hoursText = totalHours > 0 ? ` — ${totalHours.toFixed(1)} ч` : '';
+      const header=document.createElement('div');
+      header.style.cssText='font-size:16px;font-weight:600;color:#c4b5fd;margin-top:20px;margin-bottom:12px;padding-top:12px;border-top:1px solid rgba(139,127,255,.2);display:flex;justify-content:space-between;align-items:center;';
+      const title = document.createElement('span');
+      title.textContent=monthName+' '+year+hoursText;
+      header.appendChild(title);
+      list.appendChild(header);
+      monthGroups[monthKey].forEach(t=>list.appendChild(makeCard(t,String(t.id).startsWith('c_'))));
+    });
   }
 
   const pct=all.length?Math.round(done.length/all.length*100):0;
@@ -619,7 +612,7 @@ function renderTasks(){
 }
 
 setInterval(()=>{document.querySelectorAll('.live-timer').forEach(el=>{const b=parseInt(el.dataset.base)||0;const s=parseInt(el.dataset.startMs)||Date.now();el.textContent=fmtDur(b+Date.now()-s);});},1000);
-setInterval(()=>{if(curPage===2)syncDown();},10000);
+setInterval(()=>{if(curPage===2)syncDown();},30000);
 
 // ══════════════════════════════════════
 // ADMIN PANEL
