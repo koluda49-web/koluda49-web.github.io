@@ -471,9 +471,30 @@ function renderTasks(){
   const si=document.createElement('div');si.id='sync-indicator';si.style.cssText='margin-left:auto;font-size:11px;color:rgba(255,255,255,.25);';si.textContent='🔄 синхронизация...';tabBar.appendChild(si);
   list.appendChild(tabBar);
 
-  const items=taskTab==='pending'?pending:done;
-  if(!items.length){const e=document.createElement('div');e.style.cssText='text-align:center;color:rgba(255,255,255,.25);font-size:14px;padding:40px 0;';e.textContent=taskTab==='pending'?'Все задачи выполнены 🎉':'Пока нет выполненных задач';list.appendChild(e);}
-  else items.forEach(t=>list.appendChild(makeCard(t,String(t.id).startsWith('c_'))));
+  if(taskTab==='pending'){
+    const items=pending;
+    if(!items.length){const e=document.createElement('div');e.style.cssText='text-align:center;color:rgba(255,255,255,.25);font-size:14px;padding:40px 0;';e.textContent='Все задачи выполнены 🎉';list.appendChild(e);}
+    else items.forEach(t=>list.appendChild(makeCard(t,String(t.id).startsWith('c_'))));
+  }else{
+    if(!done.length){const e=document.createElement('div');e.style.cssText='text-align:center;color:rgba(255,255,255,.25);font-size:14px;padding:40px 0;';e.textContent='Пока нет выполненных задач';list.appendChild(e);}
+    else{
+      const monthGroups={};
+      done.forEach(t=>{
+        const doneAt=sharedState[t.id]&&sharedState[t.id].doneAt?new Date(sharedState[t.id].doneAt):new Date();
+        const monthKey=doneAt.getFullYear()+'-'+String(doneAt.getMonth()+1).padStart(2,'0');
+        if(!monthGroups[monthKey])monthGroups[monthKey]=[];
+        monthGroups[monthKey].push(t);
+      });
+      const sortedMonths=Object.keys(monthGroups).sort().reverse();
+      sortedMonths.forEach(monthKey=>{
+        const [year,month]=monthKey.split('-');
+        const monthName=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][parseInt(month)-1];
+        const header=document.createElement('div');header.style.cssText='font-size:16px;font-weight:600;color:#c4b5fd;margin-top:20px;margin-bottom:12px;padding-top:12px;border-top:1px solid rgba(139,127,255,.2);';header.textContent=monthName+' '+year;
+        list.appendChild(header);
+        monthGroups[monthKey].forEach(t=>list.appendChild(makeCard(t,String(t.id).startsWith('c_'))));
+      });
+    }
+  }
 
   const pct=all.length?Math.round(done.length/all.length*100):0;
   const pb=document.getElementById('progress-bar');if(pb)pb.style.width=pct+'%';
