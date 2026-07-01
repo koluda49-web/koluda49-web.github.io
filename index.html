@@ -384,6 +384,7 @@ async function syncDown(){
     });
     // Store sheet tasks globally
     window._sheetTasks = sheetTasks;
+    window._monthTotals = data.monthTotals || {};
     sharedState=newState; saveLocal(); renderTasks();
     const el=document.getElementById('sync-indicator');
     if(el)el.textContent='✓ обновлено '+new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
@@ -595,7 +596,18 @@ function renderTasks(){
       sortedMonths.forEach(monthKey=>{
         const [year,month]=monthKey.split('-');
         const monthName=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][parseInt(month)-1];
-        const header=document.createElement('div');header.style.cssText='font-size:16px;font-weight:600;color:#c4b5fd;margin-top:20px;margin-bottom:12px;padding-top:12px;border-top:1px solid rgba(139,127,255,.2);';header.textContent=monthName+' '+year;
+        const totalHours = (window._monthTotals && window._monthTotals[monthKey]) || 0;
+        const hoursText = totalHours > 0 ? ` — ${totalHours.toFixed(1)} ч` : '';
+        const header=document.createElement('div');header.style.cssText='font-size:16px;font-weight:600;color:#c4b5fd;margin-top:20px;margin-bottom:12px;padding-top:12px;border-top:1px solid rgba(139,127,255,.2);display:flex;justify-content:space-between;align-items:center;';
+        const title = document.createElement('span');
+        title.textContent=monthName+' '+year;
+        header.appendChild(title);
+        if(hoursText){
+          const hours = document.createElement('span');
+          hours.textContent = hoursText;
+          hours.style.cssText = 'font-size:14px;color:rgba(196,181,253,.7);font-weight:500;';
+          header.appendChild(hours);
+        }
         list.appendChild(header);
         monthGroups[monthKey].forEach(t=>list.appendChild(makeCard(t,String(t.id).startsWith('c_'))));
       });
