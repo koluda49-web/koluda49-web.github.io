@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Расчёт загрузки контейнера / фуры</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#16232a;
+    --ink-soft:#4a5c66;
+    --paper:#f3f5f1;
+    --card:#ffffff;
+    --line:#dde2db;
+    --teal:#2f8f86;
+    --teal-dark:#1f6a63;
+    --teal-light:#a9d6cf;
+    --amber:#e8b339;
+    --amber-dark:#b98a1f;
+    --red:#c1503e;
+    --shadow: 0 1px 2px rgba(22,35,42,.06), 0 6px 20px rgba(22,35,42,.05);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif; line-height:1.45;
+    padding-bottom:80px;
+  }
+  h1,h2,h3{ font-family:'Space Grotesk',sans-serif; margin:0; letter-spacing:-.01em;}
+  .mono{ font-family:'IBM Plex Mono',monospace; }
+  .wrap{ max-width:1180px; margin:0 auto; padding:0 24px;}
+
+  header.top{
+    background:var(--ink); color:#fff; padding:28px 0 24px;
+    border-bottom:4px solid var(--teal);
+  }
+  header.top .eyebrow{ color:var(--teal-light); font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:.14em; text-transform:uppercase; margin-bottom:6px;}
+  header.top h1{ font-size:26px; font-weight:700;}
+  header.top p{ margin:8px 0 0; color:#c7d0cd; font-size:14px; max-width:640px;}
+  #sheet-status{ margin-top:14px; font-family:'IBM Plex Mono',monospace; font-size:12px; display:flex; gap:16px; flex-wrap:wrap;}
+  #sheet-status span{ display:inline-flex; align-items:center; gap:6px; color:#c7d0cd;}
+  .dot{ width:7px; height:7px; border-radius:50%; background:var(--amber); display:inline-block;}
+  .dot.ok{ background:#7ecab8;}
+
+  section{ padding:28px 0;}
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:10px;
+    padding:22px; box-shadow:var(--shadow);
+  }
+  .section-title{ display:flex; align-items:baseline; gap:10px; margin-bottom:16px;}
+  .section-title .num{ font-family:'IBM Plex Mono',monospace; color:var(--teal-dark); font-size:13px; border:1px solid var(--teal); border-radius:4px; padding:1px 7px;}
+  .section-title h2{ font-size:18px;}
+  .section-title .hint{ font-size:12.5px; color:var(--ink-soft); margin-left:auto;}
+
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  label{ display:block; font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-bottom:5px; text-transform:uppercase; letter-spacing:.03em;}
+  input[type=text], input[type=date], input[type=number], select{
+    width:100%; padding:9px 11px; border:1px solid var(--line); border-radius:6px;
+    font-size:14.5px; font-family:'Inter',sans-serif; background:#fbfbfa; color:var(--ink);
+  }
+  input:focus, select:focus{ outline:2px solid var(--teal); outline-offset:1px; background:#fff;}
+
+  .box-row{
+    border:1px solid var(--line); border-radius:8px; padding:16px; margin-bottom:12px; background:#fafbf9;
+    position:relative;
+  }
+  .box-row .row-top{ display:flex; gap:10px; align-items:center; margin-bottom:12px;}
+  .mode-toggle{ display:flex; border:1px solid var(--line); border-radius:6px; overflow:hidden; font-size:12.5px;}
+  .mode-toggle button{
+    border:none; background:#fff; padding:7px 12px; cursor:pointer; color:var(--ink-soft); font-family:'Inter'; font-weight:600;
+  }
+  .mode-toggle button.active{ background:var(--teal); color:#fff;}
+  .remove-row{
+    margin-left:auto; background:none; border:none; color:var(--red); cursor:pointer; font-size:13px; font-weight:600;
+    display:flex; align-items:center; gap:4px;
+  }
+  .row-fields{ display:grid; grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr; gap:10px; align-items:end;}
+  .row-fields.catalog-mode{ grid-template-columns:2fr 1fr;}
+  .dims-readout{ font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--teal-dark); padding-top:8px;}
+  .upright-check{ display:flex; align-items:center; gap:7px; font-size:12.5px; color:var(--ink-soft); margin-top:12px; text-transform:none; font-weight:500; cursor:pointer;}
+  .upright-check input{ width:15px; height:15px;}
+
+  .btn{
+    border:none; border-radius:7px; padding:10px 18px; font-weight:600; font-size:14px;
+    cursor:pointer; font-family:'Inter',sans-serif; transition:transform .08s ease;
+  }
+  .btn:active{ transform:translateY(1px);}
+  .btn-teal{ background:var(--teal); color:#fff;}
+  .btn-teal:hover{ background:var(--teal-dark);}
+  .btn-outline{ background:#fff; border:1.5px solid var(--teal); color:var(--teal-dark);}
+  .btn-outline:hover{ background:#eef6f4;}
+  .btn-amber{ background:var(--amber); color:#3a2a05;}
+  .btn-amber:hover{ background:var(--amber-dark); color:#fff;}
+  .btn-ghost{ background:transparent; color:var(--ink-soft); border:1px solid var(--line);}
+  .btn-ghost{ padding:7px 12px; font-size:12.5px;}
+  .save-select-actions{ display:flex; gap:8px; margin-bottom:10px;}
+
+  .vehicle-list{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px;}
+  .vehicle-chip{
+    border:1.5px solid var(--line); border-radius:8px; padding:12px 14px; cursor:pointer;
+    background:#fff; display:flex; gap:10px; align-items:flex-start;
+  }
+  .vehicle-chip.checked{ border-color:var(--teal); background:#eef6f4;}
+  .vehicle-chip input{ margin-top:3px;}
+  .vehicle-chip .vname{ font-weight:700; font-size:14px;}
+  .vehicle-chip .vdims{ font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--ink-soft); margin-top:2px;}
+
+  .calc-bar{ display:flex; gap:12px; align-items:center; margin-top:22px;}
+  .calc-bar .btn-teal{ font-size:15px; padding:13px 28px;}
+
+  .results{ margin-top:10px;}
+  .reco{
+    border:1.5px solid var(--amber); background:#fff8e8; border-radius:10px; padding:16px 18px; margin-bottom:20px;
+    font-size:14.5px;
+  }
+  .reco b{ color:var(--amber-dark);}
+
+  .result-card{ margin-bottom:22px;}
+  .result-head{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;}
+  .result-head h3{ font-size:17px;}
+  .result-head .vdims{ font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--ink-soft);}
+  .badge{ font-size:12px; font-weight:700; padding:4px 10px; border-radius:20px; font-family:'IBM Plex Mono',monospace;}
+  .badge.full{ background:#e3f4ef; color:var(--teal-dark);}
+  .badge.partial{ background:#fdeeea; color:var(--red);}
+
+  table.res-table{ width:100%; border-collapse:collapse; font-size:13.5px; margin:12px 0 18px;}
+  table.res-table th, table.res-table td{ text-align:left; padding:8px 10px; border-bottom:1px solid var(--line);}
+  table.res-table th{ font-family:'IBM Plex Mono',monospace; font-size:11.5px; text-transform:uppercase; color:var(--ink-soft); letter-spacing:.03em;}
+  table.res-table tr:last-child td{ border-bottom:none;}
+  .util-bar{ height:7px; border-radius:4px; background:#e6e9e3; overflow:hidden; width:120px;}
+  .util-bar > div{ height:100%; background:var(--teal);}
+
+  .viz-wrap{ background:#fbfbfa; border:1px solid var(--line); border-radius:8px; padding:6px; overflow-x:auto;}
+  .viz-row{ display:flex; gap:14px; align-items:stretch;}
+  .viz-row .viz-wrap{ flex:1; min-width:0;}
+  .viz-legend{ width:190px; flex-shrink:0; background:#fbfbfa; border:1px solid var(--line); border-radius:8px; padding:12px; font-size:12.5px;}
+  .viz-legend-title{ font-family:'IBM Plex Mono',monospace; font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--ink-soft); margin-bottom:9px;}
+  .viz-legend-row{ display:flex; align-items:center; gap:8px; margin-bottom:8px; line-height:1.3;}
+  .viz-legend-swatch{ width:13px; height:13px; border-radius:3px; flex-shrink:0;}
+  @media (max-width:720px){ .viz-row{ flex-direction:column;} .viz-legend{ width:auto;} }
+
+  .stats-strip{ display:flex; gap:22px; flex-wrap:wrap; margin:10px 0 4px; font-size:13px;}
+  .stats-strip .stat b{ display:block; font-size:19px; font-family:'IBM Plex Mono',monospace; color:var(--ink);}
+  .stats-strip .stat span{ color:var(--ink-soft); font-size:11.5px; text-transform:uppercase; letter-spacing:.03em;}
+
+  .save-bar{ display:flex; gap:12px; margin-top:8px; flex-wrap:wrap; align-items:center;}
+
+  .load-item-row{
+    display:flex; align-items:center; gap:12px; padding:9px 12px; border:1px solid var(--line);
+    border-radius:6px; margin-bottom:8px; background:#fafbf9; font-size:13.5px;
+  }
+  .load-item-row .swatch{ width:12px; height:12px; border-radius:3px; flex-shrink:0;}
+  .load-item-row .li-name{ font-weight:600; flex:1;}
+  .load-item-row .li-dims{ font-family:'IBM Plex Mono',monospace; color:var(--ink-soft); font-size:12px;}
+  .load-item-row .li-qty{ font-family:'IBM Plex Mono',monospace; color:var(--teal-dark); font-weight:700;}
+  .load-item-row .li-remove{ background:none; border:none; color:var(--red); cursor:pointer; font-weight:700; font-size:13px;}
+  .add-item-row{ display:flex; gap:10px; align-items:center; margin-top:6px; flex-wrap:wrap;}
+  .add-item-row select{ flex:1; min-width:200px;}
+  .prev-route-row{ display:flex; gap:10px; align-items:center; margin-bottom:16px; flex-wrap:wrap;}
+  .prev-route-row select{ flex:1; min-width:220px;}
+  .save-status{ font-size:12.5px; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace;}
+
+  .note{ font-size:12.5px; color:var(--ink-soft); margin-top:8px;}
+  .warn-inline{ background:#fdeeea; border:1px solid #f0c6bc; color:#8a3223; padding:10px 12px; border-radius:6px; font-size:13px; margin-top:10px;}
+
+  footer{ text-align:center; padding:34px 24px 24px; color:var(--ink-soft); font-size:12.5px; max-width:1180px; margin:0 auto;}
+  .footer-inner{ display:flex; justify-content:center; align-items:center; gap:18px; flex-wrap:wrap;}
+  .footer-link{ color:var(--teal-dark); font-weight:600; text-decoration:none;}
+  .footer-link:hover{ text-decoration:underline;}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="eyebrow">Логистика / расчёт кузова</div>
+    <h1>Расчёт загрузки контейнера и фуры</h1>
+    <p>Соберите заказ, выберите транспорт для сравнения — приложение посчитает, сколько товара поместится, и покажет схему загрузки.</p>
+    <div id="sheet-status">
+      <span><i class="dot" id="dot-catalog"></i> каталог: <span id="status-catalog">загрузка…</span></span>
+      <span><i class="dot" id="dot-kont"></i> транспорт: <span id="status-kont">загрузка…</span></span>
+      <span><i class="dot" id="dot-history"></i> история маршрутов: <span id="status-history">загрузка…</span></span>
+      <span><i class="dot" id="dot-save"></i> сохранение в таблицу: <span id="status-save">не настроено</span></span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section>
+    <div class="card">
+      <div class="section-title"><span class="num">01</span><h2>Заказ</h2></div>
+      <div class="grid2">
+        <div>
+          <label for="orderName">Название груза / заказа</label>
+          <input type="text" id="orderName" placeholder="напр. Заказ №112 — мотоблоки в Алматы">
+        </div>
+        <div>
+          <label for="orderDate">Дата</label>
+          <input type="date" id="orderDate">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:0;">
+    <div class="card">
+      <div class="section-title">
+        <span class="num">02</span><h2>Товар для загрузки</h2>
+        <span class="hint">вручную или из каталога — можно комбинировать</span>
+      </div>
+
+      <div class="prev-route-row">
+        <select id="prevRouteSelect"><option value="">— загрузить состав предыдущего маршрута —</option></select>
+        <button class="btn btn-outline" id="prevRouteLoadBtn" type="button">Загрузить</button>
+        <span class="note" id="prevRouteHint" style="margin:0;"></span>
+      </div>
+
+      <div id="boxRows"></div>
+      <button class="btn btn-outline" id="addRowBtn">+ Добавить позицию</button>
+    </div>
+  </section>
+
+  <section style="padding-top:0;">
+    <div class="card">
+      <div class="section-title"><span class="num">03</span><h2>Транспорт для расчёта</h2><span class="hint">выберите один или несколько вариантов — покажем сравнение</span></div>
+      <div class="vehicle-list" id="vehicleList"></div>
+    </div>
+  </section>
+
+  <div class="calc-bar">
+    <button class="btn btn-teal" id="calcBtn">Рассчитать загрузку</button>
+    <span class="note" id="calcHint"></span>
+  </div>
+
+  <section id="resultsSection" style="display:none;">
+    <div class="section-title" style="align-items:center;">
+      <span class="num">04</span><h2>Результат</h2>
+      <span class="hint" id="resultsCollapsedHint" style="display:none;"></span>
+      <button class="btn btn-ghost" id="collapseResultsBtn" type="button" style="margin-left:auto;">▾ Свернуть загрузку</button>
+      <button class="btn btn-outline" id="newLoadBtn" type="button">+ Новая загрузка</button>
+    </div>
+
+    <div id="resultsCollapsible">
+    <div class="card" style="margin-bottom:18px;">
+      <div class="section-title" style="margin-bottom:12px;"><h2 style="font-size:15px;">Состав груза</h2><span class="hint">удалите позицию — результат ниже пересчитается сам</span></div>
+      <div id="loadItemsList"></div>
+
+      <div class="mode-toggle" id="quickAddModeToggle" style="margin-bottom:10px;">
+        <button data-mode="catalog" class="active" type="button">Из каталога</button>
+        <button data-mode="manual" type="button">Вручную</button>
+      </div>
+      <div class="add-item-row" id="quickAddCatalogRow">
+        <select id="quickAddCatalog"></select>
+        <input type="number" id="quickAddQty" min="1" value="1" style="width:80px;" placeholder="кол-во">
+        <button class="btn btn-outline" id="quickAddBtn">+ Добавить в груз</button>
+      </div>
+      <div class="add-item-row" id="quickAddManualRow" style="display:none;">
+        <input type="text" id="quickAddName" placeholder="Название" style="flex:1.4;">
+        <input type="number" id="quickAddL" min="1" placeholder="Длина, см" style="width:100px;">
+        <input type="number" id="quickAddW" min="1" placeholder="Ширина, см" style="width:100px;">
+        <input type="number" id="quickAddH" min="1" placeholder="Высота, см" style="width:100px;">
+        <input type="number" id="quickAddWeight" min="0" placeholder="Вес, кг" style="width:90px;">
+        <input type="number" id="quickAddManualQty" min="1" value="1" style="width:80px;" placeholder="кол-во">
+        <button class="btn btn-outline" id="quickAddManualBtn">+ Добавить в груз</button>
+      </div>
+    </div>
+
+    <div class="results" id="results"></div>
+
+    <div class="card">
+      <div class="section-title"><span class="num">05</span><h2>Сохранить в таблицу</h2><span class="hint">лист «itog»</span></div>
+      <p class="note" style="margin-top:0;">Отметьте, какие варианты транспорта сохранить (например, если сравнивали несколько, а везти будете только одним):</p>
+      <div class="save-select-actions">
+        <button class="btn btn-ghost" id="saveSelectAllBtn" type="button">выбрать все</button>
+        <button class="btn btn-ghost" id="saveSelectNoneBtn" type="button">снять все</button>
+      </div>
+      <div class="vehicle-list" id="saveVehicleList" style="margin-bottom:14px;"></div>
+      <div class="save-bar">
+        <button class="btn btn-outline" id="savePrelimBtn">Сохранить предварительно</button>
+        <button class="btn btn-amber" id="saveFinalBtn">Сохранить как итог</button>
+        <span class="save-status" id="saveStatus"></span>
+      </div>
+      <p class="note">«Предварительно» — сохраняется как черновик и перезаписывается при повторном сохранении черновика этого же маршрута. «Итог» — фиксирует финальное решение и перезаписывает предыдущий итог этого маршрута (не копится дублями).</p>
+    </div>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  <div class="footer-inner">
+    <button class="btn btn-outline" id="refreshDataBtn" type="button">↻ Обновить данные из таблицы</button>
+    <a href="https://docs.google.com/spreadsheets/d/1Q90X7pwQvw4SyuzICCMlgOgqADDThzLAoiX62KpzCxI/edit" target="_blank" rel="noopener" class="footer-link">Открыть таблицу «Расчёт загрузки контейнера» ↗</a>
+  </div>
+  <div class="note" id="refreshStatus" style="margin-top:8px;">Каталог, транспорт и история маршрутов подтягиваются при открытии страницы — нажмите «Обновить», если только что меняли таблицу.</div>
+</footer>
+
+<script>
+/* ========================= CONFIG ========================= */
+const SHEET_ID = '1Q90X7pwQvw4SyuzICCMlgOgqADDThzLAoiX62KpzCxI';
+const CATALOG_SHEET = 'catalog';
+const KONT_SHEET   = 'kont';
+const ITOG_SHEET   = 'itog';
+// Paste the URL you get after deploying the Apps Script web app (see instructions).
+// Leave empty to disable saving to the sheet (app still works fully offline otherwise).
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw1BMr1HDs_NISWSqGDe3HISMSUbsef9zx5hXjgJSagjrtq3UKfcEhe7xOA4J0Pxgpu/exec';
+
+/* ========================= FALLBACK DATA ========================= */
+// Used if the Google Sheet can't be reached (no internet, sheet not public, etc).
+const DEFAULT_CATALOG = [
+  { name:'Мотоблок 1030', l:84, w:46, h:66 },
+  { name:'Мотоблок 1900', l:89, w:56, h:66 },
+  { name:'Бетономешалка SHTENLI 130 PRO', l:62, w:57.7, h:43 },
+  { name:'Электровелосипед Cruise 3 48V15A', l:131, w:31, h:65 },
+];
+const DEFAULT_VEHICLES = [
+  { name:'Контейнер 40 HQ', l:1203, w:235, h:270, note:'грузоподъёмность до 26–30 т' },
+  { name:'Фура Тент',       l:1360, w:244, h:268, note:'' },
+  { name:'Фура Мега',       l:1360, w:244, h:290, note:'' },
+  { name:'Фура Длинномер',  l:1600, w:244, h:260, note:'' },
+];
+
+let CATALOG = [];
+let VEHICLES = [];
+let boxRowSeq = 0;
+let boxRows = []; // {id, mode, name, l,w,h, weight, qty, catalogIndex}
+
+/* ========================= SHEET LOADING ========================= */
+function gvizUrl(sheetName, tq){
+  const base = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+  const withTq = tq ? `${base}&tq=${encodeURIComponent(tq)}` : base;
+  // Cache-bust: Google's gviz endpoint (and some browsers) can otherwise serve a stale,
+  // previously-cached response for a while after the sheet was edited.
+  return `${withTq}&_cb=${Date.now()}`;
+}
+function fetchSheet(url){
+  return fetch(url, { cache:'no-store' });
+}
+// How many recent save-batches (rows) to pull from "itog" — keeps the request light even once the log has thousands of rows.
+const HISTORY_ROW_LIMIT = 400;
+
+function parseCsv(text){
+  // minimal CSV parser (handles quoted fields)
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for(let i=0;i<text.length;i++){
+    const c = text[i];
+    if(inQuotes){
+      if(c === '"'){
+        if(text[i+1] === '"'){ field += '"'; i++; } else { inQuotes = false; }
+      } else field += c;
+    } else {
+      if(c === '"') inQuotes = true;
+      else if(c === ','){ row.push(field); field=''; }
+      else if(c === '\n' || c === '\r'){
+        if(c === '\r' && text[i+1] === '\n') i++;
+        row.push(field); field=''; rows.push(row); row=[];
+      } else field += c;
+    }
+  }
+  if(field.length || row.length){ row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(c => c && c.trim() !== ''));
+}
+
+function parseDimsCm(str){
+  // "840*460*660" -> [840,460,660]
+  const parts = str.replace(/,/g,'.').split('*').map(s=>parseFloat(s.trim().replace(/[^\d.\-]/g,'')));
+  if(parts.length<3 || parts.some(isNaN)) return null;
+  return parts;
+}
+
+function parseDimsMeters(str){
+  // "12.03 × 2.35 × 2.70" or "13,6*2,44*2,68" or "16-16,4*2,44*2,6" -> cm
+  const norm = str.replace(/×/g,'*').replace(/,/g,'.');
+  const chunks = norm.split('*').map(s=>s.trim());
+  if(chunks.length<3) return null;
+  const nums = chunks.map(chunk=>{
+    if(chunk.includes('-')){
+      const [a,b] = chunk.split('-').map(parseFloat);
+      return (a+b)/2;
+    }
+    return parseFloat(chunk);
+  });
+  if(nums.some(isNaN)) return null;
+  return nums.map(n=>Math.round(n*100)); // meters -> cm
+}
+
+async function loadCatalog(){
+  try{
+    const res = await fetchSheet(gvizUrl(CATALOG_SHEET));
+    if(!res.ok) throw new Error('fetch failed');
+    const text = await res.text();
+    const rows = parseCsv(text).slice(1); // skip header
+    const parsed = [];
+    rows.forEach(r=>{
+      const name = (r[0]||'').trim();
+      const dimsRaw = (r[1]||'').trim();
+      if(!name || !dimsRaw) return;
+      const dims = parseDimsCm(dimsRaw);
+      if(!dims) return;
+      parsed.push({ name, l:dims[0], w:dims[1], h:dims[2] });
+    });
+    if(!parsed.length) throw new Error('empty');
+    CATALOG = parsed;
+    setStatus('catalog', true, `${parsed.length} товаров из таблицы`);
+  }catch(err){
+    CATALOG = DEFAULT_CATALOG;
+    setStatus('catalog', false, 'офлайн — встроенные данные');
+  }
+  renderCatalogOptions();
+}
+
+async function loadVehicles(){
+  try{
+    const res = await fetchSheet(gvizUrl(KONT_SHEET));
+    if(!res.ok) throw new Error('fetch failed');
+    const text = await res.text();
+    const rows = parseCsv(text).slice(1);
+    const parsed = [];
+    rows.forEach(r=>{
+      const name = (r[0]||'').trim();
+      const dimsRaw = (r[1]||'').trim();
+      if(!name || !dimsRaw) return;
+      const dims = parseDimsMeters(dimsRaw);
+      if(!dims) return;
+      parsed.push({ name, l:dims[0], w:dims[1], h:dims[2], note:'' });
+    });
+    if(!parsed.length) throw new Error('empty');
+    VEHICLES = parsed;
+    setStatus('kont', true, `${parsed.length} вариантов из таблицы`);
+  }catch(err){
+    VEHICLES = DEFAULT_VEHICLES;
+    setStatus('kont', false, 'офлайн — встроенные данные');
+  }
+  renderVehicleList();
+}
+
+function setStatus(key, ok, msg){
+  document.getElementById(`status-${key}`).textContent = msg;
+  document.getElementById(`dot-${key}`).classList.toggle('ok', ok);
+}
+
+/* ========================= PREVIOUS ROUTES (itog sheet) ========================= */
+let PREVIOUS_ORDERS = []; // [{date, orderName, itemsMap:Map(name->{qty,source}), vehicles:Set, status, timestamp}]
+
+function parseDateToISO(str){
+  str = (str||'').trim();
+  if(!str) return '';
+  let m = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = str.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})/);
+  if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  m = str.match(/Date\((\d+),(\d+),(\d+)/);
+  if(m) return `${m[1]}-${String(+m[2]+1).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+  return str;
+}
+
+function formatDateRu(iso){
+  const m = (iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : (iso || '—');
+}
+
+async function loadPreviousOrders(){
+  try{
+    const res = await fetchSheet(gvizUrl(ITOG_SHEET, `select * order by I desc limit ${HISTORY_ROW_LIMIT}`));
+    if(!res.ok) throw new Error('fetch failed');
+    const text = await res.text();
+    const rows = parseCsv(text).slice(1);
+    const map = new Map();
+    rows.forEach(r=>{
+      const dateRaw = (r[0]||'').trim(), orderName = (r[1]||'').trim(), itemName = (r[2]||'').trim();
+      const qty = parseFloat((r[3]||'0').replace(',','.')) || 0;
+      const source = (r[5]||'').trim(), vehicle = (r[6]||'').trim(), status = (r[7]||'').trim(), timestamp = (r[8]||'').trim();
+      if(!orderName || !itemName) return;
+      const dateIso = parseDateToISO(dateRaw);
+      // Group by the exact save action (timestamp), not just date+name — so a "предварительно"
+      // and later "итог" save of the same order/date show up as two separate, selectable entries.
+      const key = timestamp || (dateIso + '|' + orderName + '|' + status);
+      if(!map.has(key)) map.set(key, { date:dateIso, orderName, itemsMap:new Map(), vehicles:new Set(), status, timestamp });
+      const entry = map.get(key);
+      entry.itemsMap.set(itemName, { qty, source });
+      if(vehicle) entry.vehicles.add(vehicle);
+    });
+    PREVIOUS_ORDERS = [...map.values()].sort((a,b)=> (b.timestamp||'').localeCompare(a.timestamp||''));
+    const truncated = rows.length >= HISTORY_ROW_LIMIT;
+    setStatus('history', true, PREVIOUS_ORDERS.length
+      ? `${PREVIOUS_ORDERS.length} сохранённых${truncated ? ' (показаны последние)' : ''}`
+      : 'пока пусто');
+  }catch(err){
+    PREVIOUS_ORDERS = [];
+    setStatus('history', false, 'нет данных / лист ещё пуст');
+  }
+  renderPrevRouteOptions();
+}
+
+function formatTimeRu(ts){
+  const d = new Date(ts);
+  if(isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' });
+}
+
+function renderPrevRouteOptions(){
+  const sel = document.getElementById('prevRouteSelect');
+  // Group entries by route (date + order name) so it reads as: route name & date as a
+  // heading, with its preliminary/final saves listed underneath.
+  const groups = new Map(); // groupKey -> { date, orderName, entries:[{idx,status,timestamp}] }
+  PREVIOUS_ORDERS.forEach((o,i)=>{
+    const gKey = o.date + '|' + o.orderName;
+    if(!groups.has(gKey)) groups.set(gKey, { date:o.date, orderName:o.orderName, entries:[] });
+    groups.get(gKey).entries.push({ idx:i, status:o.status, timestamp:o.timestamp });
+  });
+  let html = '<option value="">— загрузить состав предыдущего маршрута —</option>';
+  [...groups.values()].forEach(g=>{
+    const label = `${escapeHtml(g.orderName)} — ${formatDateRu(g.date)}`;
+    html += `<optgroup label="${label}">`;
+    g.entries.forEach(e=>{
+      const time = formatTimeRu(e.timestamp);
+      const statusLabel = e.status || 'сохранён';
+      html += `<option value="${e.idx}">${escapeHtml(statusLabel)}${time?' · '+time:''}</option>`;
+    });
+    html += `</optgroup>`;
+  });
+  sel.innerHTML = html;
+}
+
+document.getElementById('prevRouteLoadBtn').onclick = ()=>{
+  const raw = document.getElementById('prevRouteSelect').value;
+  const hint = document.getElementById('prevRouteHint');
+  if(raw===''){ hint.textContent='Выберите маршрут из списка.'; return; }
+  const order = PREVIOUS_ORDERS[+raw];
+  if(!order) return;
+
+  document.getElementById('orderName').value = order.orderName;
+  if(order.date) document.getElementById('orderDate').value = order.date;
+
+  boxRows = [];
+  let missingDims = 0;
+  order.itemsMap.forEach((info, name)=>{
+    const catIdx = CATALOG.findIndex(c=> c.name.trim().toLowerCase() === name.trim().toLowerCase());
+    if(catIdx>=0){
+      addRowSilent({ mode:'catalog', catalogIndex:catIdx, name:CATALOG[catIdx].name, l:CATALOG[catIdx].l, w:CATALOG[catIdx].w, h:CATALOG[catIdx].h, qty: Math.round(info.qty)||1 });
+    } else {
+      missingDims++;
+      addRowSilent({ mode:'manual', name, l:'', w:'', h:'', weight:'', qty: Math.round(info.qty)||1 });
+    }
+  });
+  if(!boxRows.length) addRow();
+  renderRows();
+
+  selectedVehicles = new Set();
+  order.vehicles.forEach(vname=>{
+    const vi = VEHICLES.findIndex(v=> v.name.trim().toLowerCase() === vname.trim().toLowerCase());
+    if(vi>=0) selectedVehicles.add(vi);
+  });
+  renderVehicleList();
+
+  hint.textContent = missingDims
+    ? `Загружено ${order.itemsMap.size} позиций. Для ${missingDims} товаров нет размеров в каталоге — заполните вручную.`
+    : `Загружено ${order.itemsMap.size} позиций из маршрута «${order.orderName}».`;
+};
+
+
+/* ========================= BOX ROWS UI ========================= */
+function addRowSilent(prefill){
+  const id = ++boxRowSeq;
+  boxRows.push(Object.assign({
+    id, mode:'manual', name:'', l:'', w:'', h:'', weight:'', qty:1, catalogIndex:-1, upright:true
+  }, prefill||{}));
+}
+function addRow(prefill){
+  addRowSilent(prefill);
+  renderRows();
+}
+function removeRow(id){
+  boxRows = boxRows.filter(r=>r.id!==id);
+  if(!boxRows.length) addRow();
+  else renderRows();
+}
+function updateRow(id, patch){
+  const r = boxRows.find(r=>r.id===id);
+  Object.assign(r, patch);
+}
+
+function renderCatalogOptions(){
+  document.querySelectorAll('.catalog-select').forEach(sel=>{
+    const cur = sel.value;
+    sel.innerHTML = '<option value="-1">— выберите товар —</option>' +
+      CATALOG.map((c,i)=>`<option value="${i}">${escapeHtml(c.name)} (${c.l}×${c.w}×${c.h} см)</option>`).join('');
+    if(cur) sel.value = cur;
+  });
+}
+
+function renderRows(){
+  const wrap = document.getElementById('boxRows');
+  wrap.innerHTML = boxRows.map(r=>{
+    const modeManualBtn = `<button data-id="${r.id}" data-mode="manual" class="${r.mode==='manual'?'active':''}">Вручную</button>`;
+    const modeCatalogBtn = `<button data-id="${r.id}" data-mode="catalog" class="${r.mode==='catalog'?'active':''}">Из каталога</button>`;
+    let fields;
+    if(r.mode === 'manual'){
+      fields = `
+      <div class="row-fields">
+        <div><label>Название</label><input type="text" class="f-name" data-id="${r.id}" value="${escapeAttr(r.name)}" placeholder="напр. Коробка / Мотоблок X"></div>
+        <div><label>Длина, см</label><input type="number" min="1" class="f-l" data-id="${r.id}" value="${r.l}"></div>
+        <div><label>Ширина, см</label><input type="number" min="1" class="f-w" data-id="${r.id}" value="${r.w}"></div>
+        <div><label>Высота, см</label><input type="number" min="1" class="f-h" data-id="${r.id}" value="${r.h}"></div>
+        <div><label>Вес, кг</label><input type="number" min="0" class="f-weight" data-id="${r.id}" value="${r.weight}"></div>
+        <div><label>Кол-во</label><input type="number" min="1" class="f-qty" data-id="${r.id}" value="${r.qty}"></div>
+      </div>`;
+    } else {
+      const c = r.catalogIndex>=0 ? CATALOG[r.catalogIndex] : null;
+      fields = `
+      <div class="row-fields catalog-mode">
+        <div>
+          <label>Товар из каталога</label>
+          <select class="catalog-select f-catalog" data-id="${r.id}">
+            <option value="-1">— выберите товар —</option>
+            ${CATALOG.map((c,i)=>`<option value="${i}" ${r.catalogIndex===i?'selected':''}>${escapeHtml(c.name)} (${c.l}×${c.w}×${c.h} см)</option>`).join('')}
+          </select>
+        </div>
+        <div><label>Кол-во</label><input type="number" min="1" class="f-qty" data-id="${r.id}" value="${r.qty}"></div>
+      </div>
+      ${c ? `<div class="dims-readout">Габариты: ${c.l} × ${c.w} × ${c.h} см</div>` : ''}
+      `;
+    }
+    return `<div class="box-row">
+      <div class="row-top">
+        <div class="mode-toggle">${modeManualBtn}${modeCatalogBtn}</div>
+        <button class="remove-row" data-id="${r.id}">✕ удалить</button>
+      </div>
+      ${fields}
+      <label class="upright-check">
+        <input type="checkbox" class="f-upright" data-id="${r.id}" ${r.upright!==false?'checked':''}>
+        Не ставить на торец/бок — грузить как обычно (высота остаётся высотой)
+      </label>
+    </div>`;
+  }).join('');
+
+  // wire events
+  wrap.querySelectorAll('.mode-toggle button').forEach(b=>{
+    b.onclick = ()=>{ updateRow(+b.dataset.id, {mode:b.dataset.mode}); renderRows(); };
+  });
+  wrap.querySelectorAll('.remove-row').forEach(b=>{
+    b.onclick = ()=> removeRow(+b.dataset.id);
+  });
+  wrap.querySelectorAll('.f-name').forEach(i=> i.oninput = ()=> updateRow(+i.dataset.id,{name:i.value}));
+  wrap.querySelectorAll('.f-l').forEach(i=> i.oninput = ()=> updateRow(+i.dataset.id,{l:+i.value}));
+  wrap.querySelectorAll('.f-w').forEach(i=> i.oninput = ()=> updateRow(+i.dataset.id,{w:+i.value}));
+  wrap.querySelectorAll('.f-h').forEach(i=> i.oninput = ()=> updateRow(+i.dataset.id,{h:+i.value}));
+  wrap.querySelectorAll('.f-weight').forEach(i=> i.oninput = ()=> updateRow(+i.dataset.id,{weight:+i.value}));
+  wrap.querySelectorAll('.f-qty').forEach(i=> i.oninput = ()=> updateRow(+i.dataset.id,{qty:Math.max(1,+i.value||1)}));
+  wrap.querySelectorAll('.f-upright').forEach(i=> i.onchange = ()=> updateRow(+i.dataset.id,{upright:i.checked}));
+  wrap.querySelectorAll('.f-catalog').forEach(i=> i.onchange = ()=>{
+    const idx = +i.value;
+    const c = idx>=0 ? CATALOG[idx] : null;
+    updateRow(+i.dataset.id, { catalogIndex: idx, name: c?c.name:'', l:c?c.l:'', w:c?c.w:'', h:c?c.h:'' });
+    renderRows();
+  });
+}
+
+/* ========================= VEHICLE UI ========================= */
+let selectedVehicles = new Set();
+function renderVehicleList(){
+  const wrap = document.getElementById('vehicleList');
+  wrap.innerHTML = VEHICLES.map((v,i)=>`
+    <label class="vehicle-chip ${selectedVehicles.has(i)?'checked':''}" data-i="${i}">
+      <input type="checkbox" ${selectedVehicles.has(i)?'checked':''} data-i="${i}">
+      <div>
+        <div class="vname">${escapeHtml(v.name)}</div>
+        <div class="vdims">${(v.l/100).toFixed(2)} × ${(v.w/100).toFixed(2)} × ${(v.h/100).toFixed(2)} м${v.note?' · '+escapeHtml(v.note):''}</div>
+      </div>
+    </label>
+  `).join('');
+  wrap.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.onchange = ()=>{
+      const i = +cb.dataset.i;
+      if(cb.checked) selectedVehicles.add(i); else selectedVehicles.delete(i);
+      cb.closest('.vehicle-chip').classList.toggle('checked', cb.checked);
+    };
+  });
+}
+
+/* ========================= PACKING ALGORITHM ========================= */
+function bestOrientation(l, w, h, W, H, availableLength, upright){
+  let axisChoices;
+  if(upright){
+    // Keep the item's own height (h) as the vertical axis — only rotate around the vertical
+    // axis (swap which horizontal side faces "into" the container). No tipping onto a side/end.
+    axisChoices = [
+      { depth:l, foot:[w,h] },
+      { depth:w, foot:[l,h] },
+    ];
+  } else {
+    axisChoices = [
+      { depth:l, foot:[w,h] },
+      { depth:w, foot:[l,h] },
+      { depth:h, foot:[l,w] },
+    ];
+  }
+  let best = null;
+  axisChoices.forEach(({depth,foot})=>{
+    const swaps = upright ? [[foot[0],foot[1]]] : [[foot[0],foot[1]],[foot[1],foot[0]]];
+    swaps.forEach(([fw,fh])=>{
+      if(fw<=0||fh<=0||depth<=0) return;
+      const nx = Math.floor(W/fw), ny = Math.floor(H/fh);
+      if(nx>=1 && ny>=1){
+        const layers = Math.floor(availableLength/depth);
+        const count = layers*nx*ny;
+        if(!best || count>best.count || (count===best.count && depth<best.depth)){
+          best = { depth, fw, fh, nx, ny, layers, count };
+        }
+      }
+    });
+  });
+  return best;
+}
+
+function packVehicle(vehicle, items){
+  // items: [{name,l,w,h,qty,weight}]
+  const sorted = [...items].sort((a,b)=> (b.l*b.w*b.h) - (a.l*a.w*a.h));
+  let availableLength = vehicle.l;
+  const placements = [];
+  sorted.forEach(item=>{
+    const upright = item.upright !== false;
+    const ori = bestOrientation(item.l, item.w, item.h, vehicle.w, vehicle.h, availableLength, upright);
+    if(!ori || ori.count===0){
+      // Doesn't fit at all — check whether a 10x (or 100x) unit slip would explain it,
+      // so the user can spot a data-entry mistake instead of assuming the calculator is wrong.
+      let unitWarning = null;
+      for(const factor of [0.1, 0.01]){
+        const scaledOri = bestOrientation(item.l*factor, item.w*factor, item.h*factor, vehicle.w, vehicle.h, vehicle.l, upright);
+        if(scaledOri && scaledOri.count>0){ unitWarning = factor===0.1 ? '×10' : '×100'; break; }
+      }
+      placements.push({ item, placed:0, ori:null, segmentLength:0, unitWarning });
+      return;
+    }
+    const capacityPerLayer = ori.nx*ori.ny;
+    const neededLayers = Math.ceil(item.qty/capacityPerLayer);
+    const layersUsed = Math.min(ori.layers, neededLayers);
+    const placed = Math.min(item.qty, layersUsed*capacityPerLayer);
+    const segmentLength = layersUsed*ori.depth;
+    availableLength -= segmentLength;
+    placements.push({ item, placed, ori, layersUsed, segmentLength, footprintW: ori.nx*ori.fw, footprintH: ori.ny*ori.fh });
+  });
+  const totalRequested = items.reduce((s,i)=>s+i.qty,0);
+  const totalPlaced = placements.reduce((s,p)=>s+p.placed,0);
+  const totalVolume = vehicle.l*vehicle.w*vehicle.h;
+  const usedVolume = placements.reduce((s,p)=> s + p.placed*p.item.l*p.item.w*p.item.h, 0);
+  const totalWeight = placements.reduce((s,p)=> s + p.placed*(p.item.weight||0), 0);
+  return {
+    vehicle, placements, totalRequested, totalPlaced,
+    leftoverLength: Math.max(0,availableLength),
+    utilization: totalVolume ? (usedVolume/totalVolume*100) : 0,
+    totalWeight,
+    fitsAll: totalPlaced>=totalRequested,
+  };
+}
+
+/* ========================= SVG VISUALIZATION ========================= */
+function renderVehicleSVG(result){
+  const { vehicle, placements, leftoverLength } = result;
+  const L = vehicle.l, W = vehicle.w, H = vehicle.h;
+  const viewW = 920, viewH = 380;
+  const marginL = 80, marginT = 40, marginB = 60, marginR = 40;
+  const drawW = viewW - marginL - marginR;
+  const drawH = viewH - marginT - marginB;
+  const sinA = 0.5, cosA = 0.866;
+  // True isometric: x (length), y (height) and z (width) all share one scale `s`.
+  // Solve for the largest `s` that keeps the whole box within the drawing area.
+  const neededWidthUnits = (L + W) * cosA;
+  const neededHeightUnits = (L + W) * sinA + H;
+  const s = Math.min(drawW / neededWidthUnits, drawH / neededHeightUnits);
+
+  function rawProj(x,y,z){
+    return [ (x - z) * cosA * s, (x + z) * sinA * s - y * s ];
+  }
+  // Find bounding box of all 8 container corners at this scale, then center it in the canvas.
+  const rawCorners = [
+    rawProj(0,H,0), rawProj(L,H,0), rawProj(L,H,W), rawProj(0,H,W),
+    rawProj(0,0,0), rawProj(L,0,0), rawProj(L,0,W), rawProj(0,0,W),
+  ];
+  const minX = Math.min(...rawCorners.map(p=>p[0])), maxX = Math.max(...rawCorners.map(p=>p[0]));
+  const minY = Math.min(...rawCorners.map(p=>p[1])), maxY = Math.max(...rawCorners.map(p=>p[1]));
+  const offsetX = marginL + (drawW - (maxX-minX))/2 - minX;
+  const offsetY = marginT + (drawH - (maxY-minY))/2 - minY;
+
+  function projFull(x,y,z){
+    const [rx,ry] = rawProj(x,y,z);
+    return [ rx + offsetX, ry + offsetY ];
+  }
+
+  let svg = `<svg viewBox="0 0 ${viewW} ${viewH}" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Mono, monospace">`;
+
+  // container wireframe
+  const corners = {
+    A: projFull(0,H,0), B: projFull(L,H,0), C: projFull(L,H,W), D: projFull(0,H,W),
+    E: projFull(0,0,0), F: projFull(L,0,0), G: projFull(L,0,W), Hc: projFull(0,0,W),
+  };
+  const wireEdges = [['A','B'],['B','C'],['C','D'],['D','A'],['E','F'],['F','G'],['G','Hc'],['Hc','E'],['A','E'],['B','F'],['C','G'],['D','Hc']];
+  wireEdges.forEach(([p1,p2])=>{
+    svg += `<line x1="${corners[p1][0].toFixed(1)}" y1="${corners[p1][1].toFixed(1)}" x2="${corners[p2][0].toFixed(1)}" y2="${corners[p2][1].toFixed(1)}" stroke="#b7bfb3" stroke-width="1"/>`;
+  });
+
+  // leftover floor (yellow) - drawn first so cargo overlaps visually correct order along length handled by draw order below
+  function floorQuad(x0,x1,z0,z1,fill){
+    const p1=projFull(x0,0,z0), p2=projFull(x1,0,z0), p3=projFull(x1,0,z1), p4=projFull(x0,0,z1);
+    return `<polygon points="${p1.map(v=>v.toFixed(1)).join(',')} ${p2.map(v=>v.toFixed(1)).join(',')} ${p3.map(v=>v.toFixed(1)).join(',')} ${p4.map(v=>v.toFixed(1)).join(',')}" fill="${fill}" stroke="#cfae52" stroke-width="0.5"/>`;
+  }
+
+  const coveredLength = L - leftoverLength;
+  if(leftoverLength > 0.5){
+    svg += floorQuad(coveredLength, L, 0, W, '#eee2ab');
+  }
+
+  // cargo cuboid with optional grid lines (nx columns across width, ny rows across height)
+  function cuboid(x0,x1,y0,y1,z0,z1,colors,nx,ny){
+    const A_=projFull(x0,y1,z0), B_=projFull(x1,y1,z0), C_=projFull(x1,y1,z1), D_=projFull(x0,y1,z1);
+    const E_=projFull(x0,y0,z0), F_=projFull(x1,y0,z0), G_=projFull(x1,y0,z1);
+    const pts = p=>p.map(v=>v.toFixed(1)).join(',');
+    let s = '';
+    s += `<polygon points="${pts(B_)} ${pts(C_)} ${pts(G_)} ${pts(F_)}" fill="${colors.side}" stroke="#16232a" stroke-width="0.6"/>`;
+    s += `<polygon points="${pts(A_)} ${pts(B_)} ${pts(F_)} ${pts(E_)}" fill="${colors.front}" stroke="#16232a" stroke-width="0.6"/>`;
+    s += `<polygon points="${pts(A_)} ${pts(B_)} ${pts(C_)} ${pts(D_)}" fill="${colors.top}" stroke="#16232a" stroke-width="0.6"/>`;
+    // grid lines on front face (height divisions)
+    if(ny>1){
+      for(let k=1;k<ny && k<20;k++){
+        const y = y0 + (y1-y0)*k/ny;
+        const p1=projFull(x0,y,z0), p2=projFull(x1,y,z0);
+        s += `<line x1="${p1[0].toFixed(1)}" y1="${p1[1].toFixed(1)}" x2="${p2[0].toFixed(1)}" y2="${p2[1].toFixed(1)}" stroke="#16232a" stroke-opacity="0.35" stroke-width="0.6"/>`;
+        const p3=projFull(x1,y,z1);
+        s += `<line x1="${p2[0].toFixed(1)}" y1="${p2[1].toFixed(1)}" x2="${p3[0].toFixed(1)}" y2="${p3[1].toFixed(1)}" stroke="#16232a" stroke-opacity="0.3" stroke-width="0.6"/>`;
+      }
+    }
+    // grid lines on top face (width divisions)
+    if(nx>1){
+      for(let k=1;k<nx && k<20;k++){
+        const z = z0 + (z1-z0)*k/nx;
+        const p1=projFull(x0,y1,z), p2=projFull(x1,y1,z);
+        s += `<line x1="${p1[0].toFixed(1)}" y1="${p1[1].toFixed(1)}" x2="${p2[0].toFixed(1)}" y2="${p2[1].toFixed(1)}" stroke="#16232a" stroke-opacity="0.3" stroke-width="0.6"/>`;
+      }
+    }
+    return s;
+  }
+
+  // ghost outline for the empty leftover volume
+  function ghostBox(x0,x1){
+    if(x1-x0 < 0.5) return '';
+    const cA=projFull(x0,H,0), cB=projFull(x1,H,0), cC=projFull(x1,H,W), cD=projFull(x0,H,W);
+    const cE=projFull(x0,0,0), cF=projFull(x1,0,0), cG=projFull(x1,0,W), cHh=projFull(x0,0,W);
+    const pts = p=>p.map(v=>v.toFixed(1)).join(',');
+    let s = `<polygon points="${pts(cA)} ${pts(cB)} ${pts(cC)} ${pts(cD)}" fill="#f4e6ab" fill-opacity="0.45" stroke="none"/>`;
+    const edges = [[cA,cB],[cB,cC],[cC,cD],[cD,cA],[cE,cF],[cF,cG],[cG,cHh],[cHh,cE],[cA,cE],[cB,cF],[cC,cG],[cD,cHh]];
+    edges.forEach(([p1,p2])=>{
+      s += `<line x1="${p1[0].toFixed(1)}" y1="${p1[1].toFixed(1)}" x2="${p2[0].toFixed(1)}" y2="${p2[1].toFixed(1)}" stroke="#b98a1f" stroke-width="1" stroke-dasharray="4 3"/>`;
+    });
+    const mid = projFull((x0+x1)/2, H*0.42, W/2);
+    s += `<text x="${mid[0].toFixed(1)}" y="${mid[1].toFixed(1)}" font-size="12" fill="#8a651a" text-anchor="middle" font-weight="600">своб. ${Math.round(x1-x0)} см</text>`;
+    return s;
+  }
+
+  let cursor = 0;
+  const MAX_LAYERS_DRAWN = 40; // cap per item so very high box counts stay readable
+  placements.forEach((p, idx)=>{
+    if(!p.ori || p.placed===0) { cursor += p.segmentLength||0; return; }
+    const fw = p.footprintW, fh = p.footprintH, depth = p.ori.depth;
+    const colorIdx = (p.item._colorIdx ?? idx) % PALETTE.length;
+    const colors = PALETTE[colorIdx];
+    const layersToDraw = Math.min(p.layersUsed, MAX_LAYERS_DRAWN);
+    for(let l=0; l<layersToDraw; l++){
+      const x0 = cursor + l*depth, x1 = x0 + depth;
+      svg += cuboid(x0, x1, 0, fh, 0, fw, colors, p.ori.nx, p.ori.ny);
+    }
+    if(p.layersUsed > MAX_LAYERS_DRAWN){
+      // schematic block representing the remaining layers, not drawn box-by-box
+      const restX0 = cursor + layersToDraw*depth;
+      const restX1 = cursor + p.segmentLength;
+      svg += cuboid(restX0, restX1, 0, fh, 0, fw, colors, 0, 0);
+    }
+    cursor += p.segmentLength;
+  });
+
+  svg += ghostBox(coveredLength, L);
+
+
+  // axis: length ticks along bottom-front edge (E->F)
+  const tickStep = niceStep(L);
+  for(let x=0; x<=L+0.001; x+=tickStep){
+    const [px,py] = projFull(x,0,0);
+    svg += `<line x1="${px.toFixed(1)}" y1="${py.toFixed(1)}" x2="${px.toFixed(1)}" y2="${(py+6).toFixed(1)}" stroke="#8a938a" stroke-width="1"/>`;
+    svg += `<text x="${px.toFixed(1)}" y="${(py+18).toFixed(1)}" font-size="10" fill="#5c655c" text-anchor="middle">${Math.round(x)}</text>`;
+  }
+  svg += `<text x="${(marginL+drawW/2).toFixed(1)}" y="${(viewH-8).toFixed(1)}" font-size="11" fill="#8a938a" text-anchor="middle">длина, см</text>`;
+
+  // axis: height ticks along left edge (E->A)
+  const tickStepH = niceStep(H);
+  for(let y=0; y<=H+0.001; y+=tickStepH){
+    const [px,py] = projFull(0,y,0);
+    svg += `<line x1="${(px-6).toFixed(1)}" y1="${py.toFixed(1)}" x2="${px.toFixed(1)}" y2="${py.toFixed(1)}" stroke="#8a938a" stroke-width="1"/>`;
+    svg += `<text x="${(px-10).toFixed(1)}" y="${(py+3).toFixed(1)}" font-size="10" fill="#5c655c" text-anchor="end">${Math.round(y)}</text>`;
+  }
+
+  svg += `</svg>`;
+  return svg;
+}
+
+function niceStep(range){
+  const raw = range/8;
+  const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw/pow;
+  let step;
+  if(norm<1.5) step=1; else if(norm<3) step=2; else if(norm<7) step=5; else step=10;
+  return step*pow;
+}
+
+/* ========================= CALCULATE & RENDER RESULTS ========================= */
+function gatherItems(){
+  const items = [];
+  boxRows.forEach(r=>{
+    if(r.mode==='catalog'){
+      if(r.catalogIndex<0) return;
+      const c = CATALOG[r.catalogIndex];
+      items.push({ name:c.name, l:c.l, w:c.w, h:c.h, qty:+r.qty||0, weight:0, source:'catalog', catalogIndex:r.catalogIndex, upright:r.upright!==false });
+    } else {
+      if(!r.l||!r.w||!r.h||!r.qty) return;
+      items.push({ name:r.name||'Коробка', l:+r.l, w:+r.w, h:+r.h, qty:+r.qty, weight:+r.weight||0, source:'manual', upright:r.upright!==false });
+    }
+  });
+  return items;
+}
+
+document.getElementById('calcBtn').onclick = ()=>{
+  const items = gatherItems();
+  const hint = document.getElementById('calcHint');
+  if(!items.length){ hint.textContent='Добавьте хотя бы один товар с заполненными размерами и количеством.'; return; }
+  if(!selectedVehicles.size){ hint.textContent='Выберите хотя бы один вариант транспорта.'; return; }
+  hint.textContent='';
+
+  currentLoadItems = items.map((it,i)=> Object.assign({}, it, { _id: ++loadItemSeq, _colorIdx: i }));
+  currentResultVehicles = [...selectedVehicles];
+  vehiclesToSave = new Set();
+  recalcAndRender();
+  document.getElementById('resultsSection').style.display = 'block';
+  document.getElementById('resultsSection').scrollIntoView({behavior:'smooth', block:'start'});
+};
+
+let currentLoadItems = [];
+let currentResultVehicles = [];
+let loadItemSeq = 0;
+let vehiclesToSave = new Set();
+
+function recalcAndRender(){
+  if(!currentLoadItems.length){
+    document.getElementById('resultsSection').style.display = 'none';
+    return;
+  }
+  const results = currentResultVehicles.map(i=> packVehicle(VEHICLES[i], currentLoadItems));
+  window.__lastResults = results;
+  window.__lastItems = currentLoadItems;
+  renderLoadItemsPanel();
+  renderResults(results, currentLoadItems);
+  renderSaveVehicleList(results);
+}
+
+// Shared color palette: used for both the "Состав груза" swatches and the 3D cuboid faces,
+// so the same product always gets the same color everywhere on the page.
+const PALETTE = [
+  { top:'#57bcae', front:'#2f8f86', side:'#1f6a63' },
+  { top:'#7fa8d9', front:'#4a7fc4', side:'#325a94' },
+  { top:'#c3a6e0', front:'#9b76c9', side:'#71519e' },
+  { top:'#f2c66d', front:'#dba43c', side:'#b07f22' },
+  { top:'#8fcf8a', front:'#5cb057', side:'#3d8a3a' },
+  { top:'#e08fa8', front:'#c15c80', side:'#973a5c' },
+  { top:'#8fc7cf', front:'#4a95a1', side:'#2f6b75' },
+];
+
+function renderLoadItemsPanel(){
+  const wrap = document.getElementById('loadItemsList');
+  wrap.innerHTML = currentLoadItems.map(it=>`
+    <div class="load-item-row">
+      <span class="swatch" style="background:${PALETTE[it._colorIdx % PALETTE.length].front}"></span>
+      <span class="li-name">${escapeHtml(it.name)}</span>
+      <span class="li-dims">${it.l}×${it.w}×${it.h} см</span>
+      <span class="li-qty">×${it.qty}</span>
+      <button class="li-remove" data-id="${it._id}">✕ убрать</button>
+    </div>
+  `).join('');
+  wrap.querySelectorAll('.li-remove').forEach(b=>{
+    b.onclick = ()=>{
+      currentLoadItems = currentLoadItems.filter(it=>it._id !== +b.dataset.id);
+      recalcAndRender();
+    };
+  });
+
+  const sel = document.getElementById('quickAddCatalog');
+  sel.innerHTML = '<option value="-1">— выберите товар из каталога —</option>' +
+    CATALOG.map((c,i)=>`<option value="${i}">${escapeHtml(c.name)} (${c.l}×${c.w}×${c.h} см)</option>`).join('');
+}
+
+document.getElementById('quickAddBtn').onclick = ()=>{
+  const idx = +document.getElementById('quickAddCatalog').value;
+  const qty = Math.max(1, +document.getElementById('quickAddQty').value || 1);
+  if(idx < 0) return;
+  const c = CATALOG[idx];
+  currentLoadItems.push({ name:c.name, l:c.l, w:c.w, h:c.h, qty, weight:0, source:'catalog', catalogIndex:idx, upright:true, _id: ++loadItemSeq, _colorIdx: currentLoadItems.length });
+  recalcAndRender();
+};
+
+document.getElementById('quickAddManualBtn').onclick = ()=>{
+  const name = document.getElementById('quickAddName').value.trim() || 'Коробка';
+  const l = +document.getElementById('quickAddL').value;
+  const w = +document.getElementById('quickAddW').value;
+  const h = +document.getElementById('quickAddH').value;
+  const weight = +document.getElementById('quickAddWeight').value || 0;
+  const qty = Math.max(1, +document.getElementById('quickAddManualQty').value || 1);
+  if(!l || !w || !h){
+    document.getElementById('calcHint').textContent = 'Укажите длину, ширину и высоту для новой позиции.';
+    return;
+  }
+  currentLoadItems.push({ name, l, w, h, qty, weight, source:'manual', upright:true, _id: ++loadItemSeq, _colorIdx: currentLoadItems.length });
+  recalcAndRender();
+  ['quickAddName','quickAddL','quickAddW','quickAddH','quickAddWeight'].forEach(id=> document.getElementById(id).value='');
+  document.getElementById('quickAddManualQty').value = 1;
+};
+
+document.querySelectorAll('#quickAddModeToggle button').forEach(b=>{
+  b.onclick = ()=>{
+    document.querySelectorAll('#quickAddModeToggle button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    const isManual = b.dataset.mode === 'manual';
+    document.getElementById('quickAddCatalogRow').style.display = isManual ? 'none' : 'flex';
+    document.getElementById('quickAddManualRow').style.display = isManual ? 'flex' : 'none';
+  };
+});
+
+function renderSaveVehicleList(results){
+  const wrap = document.getElementById('saveVehicleList');
+  if(!vehiclesToSave.size) results.forEach(r=> vehiclesToSave.add(r.vehicle.name));
+  wrap.innerHTML = results.map(r=>`
+    <label class="vehicle-chip ${vehiclesToSave.has(r.vehicle.name)?'checked':''}">
+      <input type="checkbox" class="save-veh-cb" data-name="${escapeAttr(r.vehicle.name)}" ${vehiclesToSave.has(r.vehicle.name)?'checked':''}>
+      <div>
+        <div class="vname">${escapeHtml(r.vehicle.name)}</div>
+        <div class="vdims">${r.totalPlaced}/${r.totalRequested} шт. · заполнение ${r.utilization.toFixed(0)}%</div>
+      </div>
+    </label>
+  `).join('');
+  wrap.querySelectorAll('.save-veh-cb').forEach(cb=>{
+    cb.onchange = ()=>{
+      if(cb.checked) vehiclesToSave.add(cb.dataset.name); else vehiclesToSave.delete(cb.dataset.name);
+      cb.closest('.vehicle-chip').classList.toggle('checked', cb.checked);
+    };
+  });
+}
+
+document.getElementById('saveSelectAllBtn').onclick = ()=>{
+  vehiclesToSave = new Set(currentResultVehicles.map(i=>VEHICLES[i].name));
+  renderSaveVehicleList(window.__lastResults||[]);
+};
+document.getElementById('saveSelectNoneBtn').onclick = ()=>{
+  vehiclesToSave = new Set();
+  renderSaveVehicleList(window.__lastResults||[]);
+};
+
+/* ---- collapse / new load ---- */
+document.getElementById('collapseResultsBtn').onclick = ()=>{
+  const body = document.getElementById('resultsCollapsible');
+  const btn = document.getElementById('collapseResultsBtn');
+  const hint = document.getElementById('resultsCollapsedHint');
+  const collapsed = body.style.display === 'none';
+  body.style.display = collapsed ? '' : 'none';
+  btn.textContent = collapsed ? '▾ Свернуть загрузку' : '▸ Развернуть загрузку';
+  hint.style.display = collapsed ? 'none' : 'inline';
+  if(!collapsed){
+    const total = currentLoadItems.reduce((s,it)=>s+it.qty,0);
+    hint.textContent = `${document.getElementById('orderName').value.trim() || 'без названия'} · ${currentLoadItems.length} поз. / ${total} шт.`;
+  }
+};
+
+document.getElementById('newLoadBtn').onclick = ()=>{
+  if(currentLoadItems.length && !confirm('Начать новую загрузку? Несохранённые изменения текущей загрузки будут потеряны (если уже сохраняли — данные в таблице останутся).')) return;
+  document.getElementById('orderName').value = '';
+  document.getElementById('orderDate').value = new Date().toISOString().slice(0,10);
+  boxRows = [];
+  addRow();
+  selectedVehicles = new Set();
+  renderVehicleList();
+  currentLoadItems = [];
+  currentResultVehicles = [];
+  vehiclesToSave = new Set();
+  window.__lastResults = null;
+  window.__lastItems = null;
+  document.getElementById('resultsSection').style.display = 'none';
+  document.getElementById('resultsCollapsible').style.display = '';
+  document.getElementById('collapseResultsBtn').textContent = '▾ Свернуть загрузку';
+  document.getElementById('resultsCollapsedHint').style.display = 'none';
+  document.getElementById('calcHint').textContent = '';
+  document.getElementById('prevRouteSelect').value = '';
+  document.getElementById('prevRouteHint').textContent = '';
+  window.scrollTo({ top:0, behavior:'smooth' });
+};
+
+
+function renderResults(results, items){
+  const wrap = document.getElementById('results');
+  const fitting = results.filter(r=>r.fitsAll);
+  let reco = '';
+  if(fitting.length){
+    const best = fitting.reduce((a,b)=> a.utilization<=b.utilization ? a : b); // least wasted space among those that fit everything
+    reco = `<div class="reco">✅ Весь товар помещается в: <b>${escapeHtml(best.vehicle.name)}</b> — заполнение объёма ${best.utilization.toFixed(1)}%, остаток по длине ${Math.round(best.leftoverLength)} см.
+    ${fitting.length>1 ? ' Другие варианты, куда тоже помещается всё: '+fitting.filter(r=>r!==best).map(r=>escapeHtml(r.vehicle.name)).join(', ')+'.' : ''}</div>`;
+  } else {
+    const best = [...results].sort((a,b)=> b.totalPlaced/b.totalRequested - a.totalPlaced/a.totalRequested)[0];
+    const pct = (best.totalPlaced/best.totalRequested*100).toFixed(0);
+    reco = `<div class="reco">⚠️ Ни один выбранный вариант не вмещает весь груз целиком. Ближе всего — <b>${escapeHtml(best.vehicle.name)}</b>: помещается ${best.totalPlaced} из ${best.totalRequested} шт. (${pct}%). Возможно, стоит выбрать больший транспорт или разбить груз на несколько рейсов.</div>`;
+  }
+
+  wrap.innerHTML = reco + results.map(r=>{
+    const rows = r.placements.map(p=>`
+      <tr>
+        <td>${escapeHtml(p.item.name)}${p.unitWarning ? `<div style="color:var(--amber-dark);font-size:11.5px;font-weight:600;margin-top:2px;">⚠️ похоже на ошибку в размерах (проверьте, не в ${p.unitWarning} ли раз больше нужного)</div>` : ''}</td>
+        <td>${p.item.qty}</td>
+        <td>${p.placed}</td>
+        <td>${p.item.qty-p.placed>0 ? '<span style="color:var(--red);font-weight:600">'+(p.item.qty-p.placed)+'</span>' : '—'}</td>
+        <td class="mono">${p.ori? `${p.ori.fw}×${p.ori.fh}×${p.ori.depth} см` : '—'}</td>
+        <td class="mono">${p.ori? `${p.ori.nx}×${p.ori.ny} / слой` : '—'}</td>
+        <td class="mono">${p.ori? p.layersUsed : '—'}</td>
+      </tr>`).join('');
+    return `
+    <div class="result-card">
+      <div class="result-head">
+        <div>
+          <h3>${escapeHtml(r.vehicle.name)}</h3>
+          <div class="vdims">${(r.vehicle.l/100).toFixed(2)} × ${(r.vehicle.w/100).toFixed(2)} × ${(r.vehicle.h/100).toFixed(2)} м${r.vehicle.note?' · '+escapeHtml(r.vehicle.note):''}</div>
+        </div>
+        <span class="badge ${r.fitsAll?'full':'partial'}">${r.fitsAll? 'Весь груз помещается' : `Не помещается ${r.totalRequested-r.totalPlaced} шт.`}</span>
+      </div>
+
+      <div class="stats-strip">
+        <div class="stat"><b>${r.totalPlaced} / ${r.totalRequested}</b><span>размещено, шт.</span></div>
+        <div class="stat"><b>${r.utilization.toFixed(1)}%</b><span>заполнение объёма</span></div>
+        <div class="stat"><b>${Math.round(r.leftoverLength)} см</b><span>свободно по длине</span></div>
+        ${r.totalWeight>0 ? `<div class="stat"><b>${r.totalWeight.toFixed(0)} кг</b><span>расчётный вес груза</span></div>` : ''}
+      </div>
+
+      <table class="res-table">
+        <thead><tr><th>Товар</th><th>Заказано</th><th>Размещено</th><th>Не влезло</th><th>Ориентация (Ш×В×Гл)</th><th>Шт. в слое</th><th>Слоёв</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+
+      <div class="viz-row">
+        <div class="viz-wrap">${renderVehicleSVG(r)}</div>
+        <div class="viz-legend">
+          <div class="viz-legend-title">Цвета на схеме</div>
+          ${r.placements.filter(p=>p.placed>0).map(p=>{
+            const c = PALETTE[(p.item._colorIdx ?? 0) % PALETTE.length];
+            return `<div class="viz-legend-row"><span class="viz-legend-swatch" style="background:${c.front}"></span><span>${escapeHtml(p.item.name)} <b>×${p.placed}</b></span></div>`;
+          }).join('')}
+          ${r.leftoverLength>0.5 ? `<div class="viz-legend-row"><span class="viz-legend-swatch" style="background:#eee2ab;border:1px dashed #b98a1f;"></span><span>свободное место</span></div>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ========================= SAVE TO SHEET ========================= */
+// Tries a normal request first so we can read the server's actual JSON response (real
+// success/failure + error text). Only falls back to a blind "no-cors" request if the
+// browser can't read the response at all (Apps Script's cross-origin behavior on POST
+// isn't always consistent) — better than always flying blind like before.
+async function postToScript(action, payload){
+  const body = JSON.stringify(Object.assign({ action }, payload));
+  try{
+    const res = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body });
+    const result = await res.json();
+    return { ok: !!result.ok, error: result.error, blind:false };
+  }catch(err){
+    try{
+      await fetch(APPS_SCRIPT_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain;charset=utf-8'}, body });
+      return { ok:true, blind:true };
+    }catch(err2){
+      return { ok:false, error:'нет сети или адрес недоступен', blind:true };
+    }
+  }
+}
+
+async function saveOrder(status){
+  const statusEl = document.getElementById('saveStatus');
+  const orderName = document.getElementById('orderName').value.trim() || '(без названия)';
+  const orderDate = document.getElementById('orderDate').value || new Date().toISOString().slice(0,10);
+  const items = window.__lastItems;
+  const allResults = window.__lastResults;
+  if(!items || !allResults){ statusEl.textContent = 'Сначала выполните расчёт.'; return; }
+
+  const results = allResults.filter(r=> vehiclesToSave.has(r.vehicle.name));
+  if(!results.length){ statusEl.textContent = 'Отметьте хотя бы один вариант транспорта для сохранения.'; return; }
+
+  if(!APPS_SCRIPT_URL){
+    statusEl.textContent = 'Сохранение не настроено: добавьте APPS_SCRIPT_URL в код страницы (см. инструкцию).';
+    return;
+  }
+
+  statusEl.textContent = 'Сохранение…';
+  const timestamp = new Date().toISOString();
+  const rows = [];
+  results.forEach(r=>{
+    r.placements.forEach(p=>{
+      rows.push({
+        date: orderDate, orderName, itemName: p.item.name,
+        qtyRequested: p.item.qty, qtyPlaced: p.placed,
+        source: p.item.source==='catalog' ? 'каталог' : 'вручную',
+        vehicle: r.vehicle.name, status, timestamp,
+      });
+    });
+  });
+
+  try{
+    const result1 = await postToScript('saveOrder', { rows });
+    if(!result1.ok) throw new Error(result1.error || 'сервер вернул ошибку при сохранении маршрута');
+
+    // also register new manual-named items into the catalog (skip generic "Коробка")
+    const newCatalogItems = items.filter(i=> i.source==='manual' && i.name && i.name.trim().toLowerCase()!=='коробка');
+    let anyBlind = result1.blind;
+    for(const it of newCatalogItems){
+      const result2 = await postToScript('addToCatalog', { name: it.name, dims:`${it.l}*${it.w}*${it.h}` });
+      if(!result2.ok) throw new Error(result2.error || 'сервер вернул ошибку при добавлении в каталог');
+      anyBlind = anyBlind || result2.blind;
+    }
+    statusEl.textContent = anyBlind
+      ? `Сохранено (${status}) — ${new Date().toLocaleTimeString('ru-RU')}. Сервер не подтвердил явно (браузер заблокировал чтение ответа) — проверьте таблицу, чтобы убедиться.`
+      : `Сохранено (${status}), подтверждено сервером — ${new Date().toLocaleTimeString('ru-RU')}`;
+    loadPreviousOrders(); // refresh the previous-routes list so the just-saved route shows up immediately
+  }catch(err){
+    statusEl.textContent = 'Ошибка сохранения: ' + (err && err.message ? err.message : err);
+  }
+}
+document.getElementById('savePrelimBtn').onclick = ()=> saveOrder('предварительно');
+document.getElementById('saveFinalBtn').onclick = ()=> saveOrder('итог');
+
+/* ========================= HELPERS ========================= */
+function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeAttr(s){ return escapeHtml(s); }
+function truncate(s,n){ return s.length>n ? s.slice(0,n-1)+'…' : s; }
+
+/* ========================= INIT ========================= */
+document.getElementById('addRowBtn').onclick = ()=> addRow();
+document.getElementById('orderDate').value = new Date().toISOString().slice(0,10);
+
+(async function init(){
+  await Promise.all([loadCatalog(), loadVehicles(), loadPreviousOrders()]);
+  addRow();
+  if(!APPS_SCRIPT_URL){
+    setStatus('save', false, 'не настроено (см. инструкцию)');
+  } else {
+    setStatus('save', true, 'подключено');
+  }
+})();
+
+document.getElementById('refreshDataBtn').onclick = async ()=>{
+  const btn = document.getElementById('refreshDataBtn');
+  const statusEl = document.getElementById('refreshStatus');
+  btn.disabled = true;
+  const originalLabel = btn.textContent;
+  btn.textContent = 'Обновление…';
+  statusEl.textContent = 'Загружаю каталог, транспорт и историю маршрутов из таблицы…';
+  try{
+    await Promise.all([loadCatalog(), loadVehicles(), loadPreviousOrders()]);
+    renderRows();          // refresh catalog dropdowns inside existing box rows
+    renderLoadItemsPanel(); // refresh the quick-add catalog dropdown in results, if open
+    statusEl.textContent = `Обновлено — ${new Date().toLocaleTimeString('ru-RU')}. Уже добавленные позиции груза сохранили свои размеры (не переписываются задним числом).`;
+  }catch(err){
+    statusEl.textContent = 'Не удалось обновить данные. Проверьте подключение к интернету и доступ к таблице.';
+  }
+  btn.disabled = false;
+  btn.textContent = originalLabel;
+};
+</script>
+</body>
+</html>
