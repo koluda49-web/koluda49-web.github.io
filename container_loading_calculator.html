@@ -333,9 +333,10 @@ let boxRowSeq = 0;
 let boxRows = []; // {id, mode, name, l,w,h, weight, qty, catalogIndex}
 
 /* ========================= SHEET LOADING ========================= */
-function gvizUrl(sheetName, tq){
+function gvizUrl(sheetName, tq, range){
   const base = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
-  const withTq = tq ? `${base}&tq=${encodeURIComponent(tq)}` : base;
+  const withRange = range ? `${base}&range=${encodeURIComponent(range)}` : base;
+  const withTq = tq ? `${withRange}&tq=${encodeURIComponent(tq)}` : withRange;
   // Cache-bust: Google's gviz endpoint (and some browsers) can otherwise serve a stale,
   // previously-cached response for a while after the sheet was edited.
   return `${withTq}&_cb=${Date.now()}`;
@@ -394,7 +395,7 @@ function parseDimsMeters(str){
 
 async function loadCatalog(){
   try{
-    const res = await fetchSheet(gvizUrl(CATALOG_SHEET));
+    const res = await fetchSheet(gvizUrl(CATALOG_SHEET, null, 'A1:C2000'));
     if(!res.ok) throw new Error('fetch failed');
     const text = await res.text();
     const rows = parseCsv(text).slice(1); // skip header
@@ -422,7 +423,7 @@ async function loadCatalog(){
 
 async function loadVehicles(){
   try{
-    const res = await fetchSheet(gvizUrl(KONT_SHEET));
+    const res = await fetchSheet(gvizUrl(KONT_SHEET, null, 'A1:B2000'));
     if(!res.ok) throw new Error('fetch failed');
     const text = await res.text();
     const rows = parseCsv(text).slice(1);
