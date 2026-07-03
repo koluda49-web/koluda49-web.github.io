@@ -105,6 +105,8 @@
   .vehicle-chip input{ margin-top:3px;}
   .vehicle-chip .vname{ font-weight:700; font-size:14px;}
   .vehicle-chip .vdims{ font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--ink-soft); margin-top:2px;}
+  .veh-qty-wrap{ display:flex; align-items:center; gap:3px; flex-shrink:0; color:var(--ink-soft); font-size:13px;}
+  .veh-qty-wrap input{ width:42px; padding:4px 5px; border:1px solid var(--line); border-radius:5px; font-size:13px; text-align:center; background:#fff;}
 
   .calc-bar{ display:flex; gap:12px; align-items:center; margin-top:22px;}
   .calc-bar .btn-teal{ font-size:15px; padding:13px 28px;}
@@ -117,6 +119,9 @@
   .reco b{ color:var(--amber-dark);}
 
   .result-card{ margin-bottom:22px;}
+  .fleet-unit{ margin-top:14px; padding-top:14px;}
+  .fleet-unit + .fleet-unit{ border-top:1px dashed var(--line);}
+  .fleet-unit-title{ font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--teal-dark); font-weight:600; margin-bottom:8px; text-transform:uppercase; letter-spacing:.02em;}
   .result-head{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;}
   .result-head h3{ font-size:17px;}
   .result-head .vdims{ font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--ink-soft);}
@@ -310,10 +315,10 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw1BMr1HDs_NISW
 /* ========================= FALLBACK DATA ========================= */
 // Used if the Google Sheet can't be reached (no internet, sheet not public, etc).
 const DEFAULT_CATALOG = [
-  { name:'Мотоблок 1030', l:84, w:46, h:66 },
-  { name:'Мотоблок 1900', l:89, w:56, h:66 },
-  { name:'Бетономешалка SHTENLI 130 PRO', l:62, w:57.7, h:43 },
-  { name:'Электровелосипед Cruise 3 48V15A', l:131, w:31, h:65 },
+  { name:'Мотоблок 1030', l:84, w:46, h:66, weight:0 },
+  { name:'Мотоблок 1900', l:89, w:56, h:66, weight:0 },
+  { name:'Бетономешалка SHTENLI 130 PRO', l:62, w:57.7, h:43, weight:0 },
+  { name:'Электровелосипед Cruise 3 48V15A', l:131, w:31, h:65, weight:0 },
 ];
 const DEFAULT_VEHICLES = [
   { name:'Контейнер 40 HQ', l:1203, w:235, h:270, note:'грузоподъёмность до 26–30 т' },
@@ -400,7 +405,9 @@ async function loadCatalog(){
       if(!name || !dimsRaw) return;
       const dims = parseDimsCm(dimsRaw);
       if(!dims) return;
-      parsed.push({ name, l:dims[0], w:dims[1], h:dims[2] });
+      const weightRaw = (r[2]||'').trim();
+      const weight = weightRaw ? parseFloat(weightRaw.replace(',','.').replace(/[^\d.\-]/g,'')) : 0;
+      parsed.push({ name, l:dims[0], w:dims[1], h:dims[2], weight: isNaN(weight) ? 0 : weight });
     });
     if(!parsed.length) throw new Error('empty');
     CATALOG = parsed;
@@ -587,7 +594,7 @@ function renderCatalogOptions(){
   document.querySelectorAll('.catalog-select').forEach(sel=>{
     const cur = sel.value;
     sel.innerHTML = '<option value="-1">— выберите товар —</option>' +
-      CATALOG.map((c,i)=>`<option value="${i}">${escapeHtml(c.name)} (${c.l}×${c.w}×${c.h} см)</option>`).join('');
+      CATALOG.map((c,i)=>`<option value="${i}">${escapeHtml(c.name)} (${c.l}×${c.w}×${c.h} см${c.weight?', '+c.weight+' кг':''})</option>`).join('');
     if(cur) sel.value = cur;
   });
 }
@@ -616,12 +623,12 @@ function renderRows(){
           <label>Товар из каталога</label>
           <select class="catalog-select f-catalog" data-id="${r.id}">
             <option value="-1">— выберите товар —</option>
-            ${CATALOG.map((c,i)=>`<option value="${i}" ${r.catalogIndex===i?'selected':''}>${escapeHtml(c.name)} (${c.l}×${c.w}×${c.h} см)</option>`).join('')}
+            ${CATALOG.map((c,i)=>`<option value="${i}" ${r.catalogIndex===i?'selected':''}>${escapeHtml(c.name)} (${c.l}×${c.w}×${c.h} см${c.weight?', '+c.weight+' кг':''})</option>`).join('')}
           </select>
         </div>
         <div><label>Кол-во</label><input type="number" min="1" class="f-qty" data-id="${r.id}" value="${r.qty}"></div>
       </div>
-      ${c ? `<div class="dims-readout">Габариты: ${c.l} × ${c.w} × ${c.h} см</div>` : ''}
+      ${c ? `<div class="dims-readout">Габариты: ${c.l} × ${c.w} × ${c.h} см${c.weight?' · вес '+c.weight+' кг':''}</div>` : ''}
       `;
     }
     return `<div class="box-row">
@@ -661,14 +668,20 @@ function renderRows(){
 
 /* ========================= VEHICLE UI ========================= */
 let selectedVehicles = new Set();
+let vehicleQty = {}; // vehicle index -> how many units of it to plan for (default 1)
+
 function renderVehicleList(){
   const wrap = document.getElementById('vehicleList');
   wrap.innerHTML = VEHICLES.map((v,i)=>`
     <label class="vehicle-chip ${selectedVehicles.has(i)?'checked':''}" data-i="${i}">
       <input type="checkbox" ${selectedVehicles.has(i)?'checked':''} data-i="${i}">
-      <div>
+      <div style="flex:1;">
         <div class="vname">${escapeHtml(v.name)}</div>
         <div class="vdims">${(v.l/100).toFixed(2)} × ${(v.w/100).toFixed(2)} × ${(v.h/100).toFixed(2)} м${v.note?' · '+escapeHtml(v.note):''}</div>
+      </div>
+      <div class="veh-qty-wrap" onclick="event.preventDefault()">
+        <span>×</span>
+        <input type="number" class="veh-qty" data-i="${i}" min="1" max="20" value="${vehicleQty[i]||1}" title="Сколько единиц этого транспорта считать">
       </div>
     </label>
   `).join('');
@@ -677,6 +690,14 @@ function renderVehicleList(){
       const i = +cb.dataset.i;
       if(cb.checked) selectedVehicles.add(i); else selectedVehicles.delete(i);
       cb.closest('.vehicle-chip').classList.toggle('checked', cb.checked);
+    };
+  });
+  wrap.querySelectorAll('.veh-qty').forEach(inp=>{
+    inp.onclick = (e)=> e.stopPropagation();
+    inp.onchange = ()=>{
+      const i = +inp.dataset.i;
+      vehicleQty[i] = Math.max(1, Math.min(20, +inp.value || 1));
+      inp.value = vehicleQty[i];
     };
   });
 }
@@ -753,6 +774,32 @@ function packVehicle(vehicle, items){
     leftoverLength: Math.max(0,availableLength),
     utilization: totalVolume ? (usedVolume/totalVolume*100) : 0,
     totalWeight,
+    fitsAll: totalPlaced>=totalRequested,
+  };
+}
+
+// Plans a whole fleet of N identical units of one vehicle type: fills unit 1 to capacity
+// with packVehicle, carries over whatever didn't fit into unit 2, and so on, stopping once
+// either the cargo runs out or the allotted number of units is used up.
+function packFleet(vehicle, unitCount, items){
+  const remaining = items.map(it=> Object.assign({}, it)); // clone so qty can be decremented per unit
+  const units = [];
+  for(let u=0; u<unitCount; u++){
+    const activeItems = remaining.filter(it=>it.qty>0);
+    if(!activeItems.length) break;
+    const result = packVehicle(vehicle, activeItems);
+    result.placements.forEach(p=>{ p.item.qty -= p.placed; });
+    units.push(result);
+  }
+  const totalRequested = items.reduce((s,i)=>s+i.qty,0);
+  const totalPlaced = units.reduce((s,u)=>s+u.totalPlaced,0);
+  const totalWeight = units.reduce((s,u)=>s+u.totalWeight,0);
+  const avgUtilization = units.length ? units.reduce((s,u)=>s+u.utilization,0)/units.length : 0;
+  return {
+    vehicle, unitCount, units,
+    unitsUsed: units.length,
+    totalRequested, totalPlaced, totalWeight,
+    avgUtilization,
     fitsAll: totalPlaced>=totalRequested,
   };
 }
@@ -920,7 +967,7 @@ function gatherItems(){
     if(r.mode==='catalog'){
       if(r.catalogIndex<0) return;
       const c = CATALOG[r.catalogIndex];
-      items.push({ name:c.name, l:c.l, w:c.w, h:c.h, qty:+r.qty||0, weight:0, source:'catalog', catalogIndex:r.catalogIndex, upright:r.upright!==false });
+      items.push({ name:c.name, l:c.l, w:c.w, h:c.h, qty:+r.qty||0, weight:c.weight||0, source:'catalog', catalogIndex:r.catalogIndex, upright:r.upright!==false });
     } else {
       if(!r.l||!r.w||!r.h||!r.qty) return;
       items.push({ name:r.name||'Коробка', l:+r.l, w:+r.w, h:+r.h, qty:+r.qty, weight:+r.weight||0, source:'manual', upright:r.upright!==false });
@@ -954,7 +1001,7 @@ function recalcAndRender(){
     document.getElementById('resultsSection').style.display = 'none';
     return;
   }
-  const results = currentResultVehicles.map(i=> packVehicle(VEHICLES[i], currentLoadItems));
+  const results = currentResultVehicles.map(i=> packFleet(VEHICLES[i], vehicleQty[i]||1, currentLoadItems));
   window.__lastResults = results;
   window.__lastItems = currentLoadItems;
   renderLoadItemsPanel();
@@ -994,7 +1041,7 @@ function renderLoadItemsPanel(){
 
   const sel = document.getElementById('quickAddCatalog');
   sel.innerHTML = '<option value="-1">— выберите товар из каталога —</option>' +
-    CATALOG.map((c,i)=>`<option value="${i}">${escapeHtml(c.name)} (${c.l}×${c.w}×${c.h} см)</option>`).join('');
+    CATALOG.map((c,i)=>`<option value="${i}">${escapeHtml(c.name)} (${c.l}×${c.w}×${c.h} см${c.weight?', '+c.weight+' кг':''})</option>`).join('');
 }
 
 document.getElementById('quickAddBtn').onclick = ()=>{
@@ -1002,7 +1049,7 @@ document.getElementById('quickAddBtn').onclick = ()=>{
   const qty = Math.max(1, +document.getElementById('quickAddQty').value || 1);
   if(idx < 0) return;
   const c = CATALOG[idx];
-  currentLoadItems.push({ name:c.name, l:c.l, w:c.w, h:c.h, qty, weight:0, source:'catalog', catalogIndex:idx, upright:true, _id: ++loadItemSeq, _colorIdx: currentLoadItems.length });
+  currentLoadItems.push({ name:c.name, l:c.l, w:c.w, h:c.h, qty, weight:c.weight||0, source:'catalog', catalogIndex:idx, upright:true, _id: ++loadItemSeq, _colorIdx: currentLoadItems.length });
   recalcAndRender();
 };
 
@@ -1041,7 +1088,7 @@ function renderSaveVehicleList(results){
       <input type="checkbox" class="save-veh-cb" data-name="${escapeAttr(r.vehicle.name)}" ${vehiclesToSave.has(r.vehicle.name)?'checked':''}>
       <div>
         <div class="vname">${escapeHtml(r.vehicle.name)}</div>
-        <div class="vdims">${r.totalPlaced}/${r.totalRequested} шт. · заполнение ${r.utilization.toFixed(0)}%</div>
+        <div class="vdims">${r.totalPlaced}/${r.totalRequested} шт.${r.unitCount>1?' · '+r.unitsUsed+'/'+r.unitCount+' ед.':''} · заполнение ${r.avgUtilization.toFixed(0)}%</div>
       </div>
     </label>
   `).join('');
@@ -1106,31 +1153,58 @@ function renderResults(results, items){
   const fitting = results.filter(r=>r.fitsAll);
   let reco = '';
   if(fitting.length){
-    const best = fitting.reduce((a,b)=> a.utilization<=b.utilization ? a : b); // least wasted space among those that fit everything
-    reco = `<div class="reco">✅ Весь товар помещается в: <b>${escapeHtml(best.vehicle.name)}</b> — заполнение объёма ${best.utilization.toFixed(1)}%, остаток по длине ${Math.round(best.leftoverLength)} см.
-    ${fitting.length>1 ? ' Другие варианты, куда тоже помещается всё: '+fitting.filter(r=>r!==best).map(r=>escapeHtml(r.vehicle.name)).join(', ')+'.' : ''}</div>`;
+    const best = fitting.reduce((a,b)=> a.avgUtilization<=b.avgUtilization ? a : b); // least wasted space among those that fit everything
+    const bestUnitsNote = best.unitCount>1 ? ` (использовано ${best.unitsUsed} из ${best.unitCount} ед.)` : '';
+    reco = `<div class="reco">✅ Весь товар помещается в: <b>${escapeHtml(best.vehicle.name)}</b>${bestUnitsNote} — среднее заполнение объёма ${best.avgUtilization.toFixed(1)}%.
+    ${fitting.length>1 ? ' Другие варианты, куда тоже помещается всё: '+fitting.filter(r=>r!==best).map(r=>escapeHtml(r.vehicle.name)+(r.unitCount>1?' ×'+r.unitCount:'')).join(', ')+'.' : ''}</div>`;
   } else {
     const best = [...results].sort((a,b)=> b.totalPlaced/b.totalRequested - a.totalPlaced/a.totalRequested)[0];
     const pct = (best.totalPlaced/best.totalRequested*100).toFixed(0);
-    reco = `<div class="reco">⚠️ Ни один выбранный вариант не вмещает весь груз целиком. Ближе всего — <b>${escapeHtml(best.vehicle.name)}</b>: помещается ${best.totalPlaced} из ${best.totalRequested} шт. (${pct}%). Возможно, стоит выбрать больший транспорт или разбить груз на несколько рейсов.</div>`;
+    const unitsNote = best.unitCount>1 ? ` (все ${best.unitCount} ед. заняты полностью)` : '';
+    reco = `<div class="reco">⚠️ Ни один выбранный вариант не вмещает весь груз целиком. Ближе всего — <b>${escapeHtml(best.vehicle.name)}</b>${unitsNote}: помещается ${best.totalPlaced} из ${best.totalRequested} шт. (${pct}%). Возможно, стоит увеличить количество единиц транспорта, выбрать больший транспорт или разбить груз на несколько рейсов.</div>`;
   }
 
   wrap.innerHTML = reco + results.map(r=>{
-    const rows = r.placements.map(p=>`
-      <tr>
-        <td>${escapeHtml(p.item.name)}${p.unitWarning ? `<div style="color:var(--amber-dark);font-size:11.5px;font-weight:600;margin-top:2px;">⚠️ похоже на ошибку в размерах (проверьте, не в ${p.unitWarning} ли раз больше нужного)</div>` : ''}</td>
-        <td>${p.item.qty}</td>
-        <td>${p.placed}</td>
-        <td>${p.item.qty-p.placed>0 ? '<span style="color:var(--red);font-weight:600">'+(p.item.qty-p.placed)+'</span>' : '—'}</td>
-        <td class="mono">${p.ori? `${p.ori.fw}×${p.ori.fh}×${p.ori.depth} см` : '—'}</td>
-        <td class="mono">${p.ori? `${p.ori.nx}×${p.ori.ny} / слой` : '—'}</td>
-        <td class="mono">${p.ori? p.layersUsed : '—'}</td>
-      </tr>`).join('');
+    const unitsHtml = r.units.map((unit, uIdx)=>{
+      const rows = unit.placements.map(p=>`
+        <tr>
+          <td>${escapeHtml(p.item.name)}${p.unitWarning ? `<div style="color:var(--amber-dark);font-size:11.5px;font-weight:600;margin-top:2px;">⚠️ похоже на ошибку в размерах (проверьте, не в ${p.unitWarning} ли раз больше нужного)</div>` : ''}</td>
+          <td>${p.item.qty + p.placed}</td>
+          <td>${p.placed}</td>
+          <td class="mono">${p.ori? `${p.ori.fw}×${p.ori.fh}×${p.ori.depth} см` : '—'}</td>
+          <td class="mono">${p.ori? `${p.ori.nx}×${p.ori.ny} / слой` : '—'}</td>
+          <td class="mono">${p.ori? p.layersUsed : '—'}</td>
+        </tr>`).join('');
+      return `
+      <div class="fleet-unit">
+        ${r.unitCount>1 ? `<div class="fleet-unit-title">Единица ${uIdx+1} из ${r.unitCount} · ${unit.totalPlaced} шт. · заполнение ${unit.utilization.toFixed(1)}% · свободно ${Math.round(unit.leftoverLength)} см</div>` : ''}
+        <table class="res-table">
+          <thead><tr><th>Товар</th><th>В эту единицу</th><th>Размещено</th><th>Ориентация (Ш×В×Гл)</th><th>Шт. в слое</th><th>Слоёв</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div class="viz-row">
+          <div class="viz-wrap">${renderVehicleSVG(unit)}</div>
+          <div class="viz-legend">
+            <div class="viz-legend-title">Цвета на схеме</div>
+            ${unit.placements.filter(p=>p.placed>0).map(p=>{
+              const c = PALETTE[(p.item._colorIdx ?? 0) % PALETTE.length];
+              return `<div class="viz-legend-row"><span class="viz-legend-swatch" style="background:${c.front}"></span><span>${escapeHtml(p.item.name)} <b>×${p.placed}</b></span></div>`;
+            }).join('')}
+            ${unit.leftoverLength>0.5 ? `<div class="viz-legend-row"><span class="viz-legend-swatch" style="background:#eee2ab;border:1px dashed #b98a1f;"></span><span>свободное место</span></div>` : ''}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+    const unitsSummary = r.unitCount>1
+      ? (r.unitsUsed<r.unitCount ? `использовано ${r.unitsUsed} из ${r.unitCount} ед.` : `задействованы все ${r.unitCount} ед.`)
+      : null;
+
     return `
     <div class="result-card">
       <div class="result-head">
         <div>
-          <h3>${escapeHtml(r.vehicle.name)}</h3>
+          <h3>${escapeHtml(r.vehicle.name)}${r.unitCount>1?' × '+r.unitCount:''}</h3>
           <div class="vdims">${(r.vehicle.l/100).toFixed(2)} × ${(r.vehicle.w/100).toFixed(2)} × ${(r.vehicle.h/100).toFixed(2)} м${r.vehicle.note?' · '+escapeHtml(r.vehicle.note):''}</div>
         </div>
         <span class="badge ${r.fitsAll?'full':'partial'}">${r.fitsAll? 'Весь груз помещается' : `Не помещается ${r.totalRequested-r.totalPlaced} шт.`}</span>
@@ -1138,27 +1212,12 @@ function renderResults(results, items){
 
       <div class="stats-strip">
         <div class="stat"><b>${r.totalPlaced} / ${r.totalRequested}</b><span>размещено, шт.</span></div>
-        <div class="stat"><b>${r.utilization.toFixed(1)}%</b><span>заполнение объёма</span></div>
-        <div class="stat"><b>${Math.round(r.leftoverLength)} см</b><span>свободно по длине</span></div>
+        <div class="stat"><b>${r.avgUtilization.toFixed(1)}%</b><span>ср. заполнение объёма</span></div>
+        ${unitsSummary ? `<div class="stat"><b>${r.unitsUsed}/${r.unitCount}</b><span>единиц транспорта</span></div>` : ''}
         ${r.totalWeight>0 ? `<div class="stat"><b>${r.totalWeight.toFixed(0)} кг</b><span>расчётный вес груза</span></div>` : ''}
       </div>
 
-      <table class="res-table">
-        <thead><tr><th>Товар</th><th>Заказано</th><th>Размещено</th><th>Не влезло</th><th>Ориентация (Ш×В×Гл)</th><th>Шт. в слое</th><th>Слоёв</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-
-      <div class="viz-row">
-        <div class="viz-wrap">${renderVehicleSVG(r)}</div>
-        <div class="viz-legend">
-          <div class="viz-legend-title">Цвета на схеме</div>
-          ${r.placements.filter(p=>p.placed>0).map(p=>{
-            const c = PALETTE[(p.item._colorIdx ?? 0) % PALETTE.length];
-            return `<div class="viz-legend-row"><span class="viz-legend-swatch" style="background:${c.front}"></span><span>${escapeHtml(p.item.name)} <b>×${p.placed}</b></span></div>`;
-          }).join('')}
-          ${r.leftoverLength>0.5 ? `<div class="viz-legend-row"><span class="viz-legend-swatch" style="background:#eee2ab;border:1px dashed #b98a1f;"></span><span>свободное место</span></div>` : ''}
-        </div>
-      </div>
+      ${unitsHtml}
     </div>`;
   }).join('');
 }
@@ -1173,7 +1232,7 @@ async function postToScript(action, payload){
   try{
     const res = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body });
     const result = await res.json();
-    return { ok: !!result.ok, error: result.error, blind:false };
+    return { ok: !!result.ok, error: result.error, debug: result.debug, blind:false };
   }catch(err){
     try{
       await fetch(APPS_SCRIPT_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain;charset=utf-8'}, body });
@@ -1204,11 +1263,15 @@ async function saveOrder(status){
   const timestamp = new Date().toISOString();
   const rows = [];
   results.forEach(r=>{
-    r.placements.forEach(p=>{
+    const placedByName = {};
+    r.units.forEach(u=> u.placements.forEach(p=>{
+      placedByName[p.item.name] = (placedByName[p.item.name]||0) + p.placed;
+    }));
+    items.forEach(it=>{
       rows.push({
-        date: orderDate, orderName, itemName: p.item.name,
-        qtyRequested: p.item.qty, qtyPlaced: p.placed,
-        source: p.item.source==='catalog' ? 'каталог' : 'вручную',
+        date: orderDate, orderName, itemName: it.name,
+        qtyRequested: it.qty, qtyPlaced: placedByName[it.name]||0,
+        source: it.source==='catalog' ? 'каталог' : 'вручную',
         vehicle: r.vehicle.name, status, timestamp,
       });
     });
@@ -1222,7 +1285,7 @@ async function saveOrder(status){
     const newCatalogItems = items.filter(i=> i.source==='manual' && i.name && i.name.trim().toLowerCase()!=='коробка');
     let anyBlind = result1.blind;
     for(const it of newCatalogItems){
-      const result2 = await postToScript('addToCatalog', { name: it.name, dims:`${it.l}*${it.w}*${it.h}` });
+      const result2 = await postToScript('addToCatalog', { name: it.name, dims:`${it.l}*${it.w}*${it.h}`, weight: it.weight||0 });
       if(!result2.ok) throw new Error(result2.error || 'сервер вернул ошибку при добавлении в каталог');
       anyBlind = anyBlind || result2.blind;
     }
