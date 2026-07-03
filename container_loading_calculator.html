@@ -399,19 +399,20 @@ async function loadCatalog(){
     const text = await res.text();
     const rows = parseCsv(text).slice(1); // skip header
     const parsed = [];
+    let skipped = 0;
     rows.forEach(r=>{
       const name = (r[0]||'').trim();
       const dimsRaw = (r[1]||'').trim();
-      if(!name || !dimsRaw) return;
+      if(!name || !dimsRaw) { if(name||dimsRaw) skipped++; return; }
       const dims = parseDimsCm(dimsRaw);
-      if(!dims) return;
+      if(!dims) { skipped++; return; }
       const weightRaw = (r[2]||'').trim();
       const weight = weightRaw ? parseFloat(weightRaw.replace(',','.').replace(/[^\d.\-]/g,'')) : 0;
       parsed.push({ name, l:dims[0], w:dims[1], h:dims[2], weight: isNaN(weight) ? 0 : weight });
     });
     if(!parsed.length) throw new Error('empty');
     CATALOG = parsed;
-    setStatus('catalog', true, `${parsed.length} товаров из таблицы`);
+    setStatus('catalog', true, `${parsed.length} товаров из таблицы${skipped ? ` (${skipped} строк не распознано — проверьте формат "Длина*Ширина*Высота" в столбце B)` : ''}`);
   }catch(err){
     CATALOG = DEFAULT_CATALOG;
     setStatus('catalog', false, 'офлайн — встроенные данные');
