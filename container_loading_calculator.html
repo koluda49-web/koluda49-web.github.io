@@ -395,7 +395,7 @@ function parseDimsMeters(str){
 
 async function loadCatalog(){
   try{
-    const res = await fetchSheet(gvizUrl(CATALOG_SHEET, null, 'A1:C2000'));
+    const res = await fetchSheet(gvizUrl(CATALOG_SHEET, 'select A,B,C', 'A1:C2000'));
     if(!res.ok) throw new Error('fetch failed');
     const text = await res.text();
     const rows = parseCsv(text).slice(1); // skip header
@@ -423,7 +423,7 @@ async function loadCatalog(){
 
 async function loadVehicles(){
   try{
-    const res = await fetchSheet(gvizUrl(KONT_SHEET, null, 'A1:B2000'));
+    const res = await fetchSheet(gvizUrl(KONT_SHEET, 'select A,B', 'A1:B2000'));
     if(!res.ok) throw new Error('fetch failed');
     const text = await res.text();
     const rows = parseCsv(text).slice(1);
