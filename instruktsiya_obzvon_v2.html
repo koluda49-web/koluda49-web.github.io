@@ -402,12 +402,19 @@
       <div class="install-step">
         <div class="num">3</div>
         <div class="content">
-          <strong>Установить Python (если ещё не стоит)</strong>
-          <p>При первом запуске START.bat откроется браузер со страницей загрузки. При установке обязательно поставь галочку <strong>«Add Python to PATH»</strong>.</p>
+          <strong>Установить Google Chrome (если ещё не стоит)</strong>
+          <p>Скрипт управляет именно Chrome. Скачай с <a href="https://www.google.com/chrome" target="_blank" style="color:var(--blue);">google.com/chrome</a> и установи. Без Chrome скрипт не запустится.</p>
         </div>
       </div>
       <div class="install-step">
         <div class="num">4</div>
+        <div class="content">
+          <strong>Установить Python (если ещё не стоит)</strong>
+          <p>При первом запуске START.bat откроется браузер со страницей загрузки. При установке обязательно поставь галочку <strong>«Add Python to PATH»</strong>. После установки нажми <strong>«Disable path length limit»</strong>.</p>
+        </div>
+      </div>
+      <div class="install-step">
+        <div class="num">5</div>
         <div class="content">
           <strong>Запустить START.bat</strong>
           <p>Дважды кликни по START.bat — откроется чёрное окно консоли. При первом запуске библиотеки установятся автоматически (2–5 минут). После первого входа в CRM через Google сессия сохранится — повторно вводить логин не потребуется.</p>
@@ -530,8 +537,14 @@
   <!-- РЕЗУЛЬТАТЫ -->
   <div class="section">
     <div class="section-title"><span class="icon">📊</span> Результаты обзвона</div>
-    <p>После шага 3 в Google Таблице (лист «Результаты обзвона») и в файле <code>crm_with_results.xlsx</code> появятся колонка «Результат обзвона» и колонка <strong>«Открыть в CRM»</strong> — кликабельная ссылка прямо на карточку заказа. Строки автоматически подсвечиваются цветом:</p>
-    <div class="notice info" style="margin-bottom:1rem;"><span class="ico">📊</span><span>Открыть Google Таблицу: <a href="https://docs.google.com/spreadsheets/d/1SaECb7ZwekveMYviFUqW7e6eGjExr5U3Aloqkhxum9c/edit?gid=1342720212#gid=1342720212" target="_blank" style="color:#1a56db; font-weight:600;">Результаты обзвона Зикмес</a></span></div>
+    <p>После шага 3 в Google Таблице появляются:</p>
+    <ul style="padding-left:1.5rem; margin-bottom:0.8rem; display:flex; flex-direction:column; gap:0.3rem;">
+      <li>Лист <strong>«Результаты обзвона»</strong> — все заказы с результатом и ссылкой «Открыть в CRM», строки подсвечены цветом</li>
+      <li>Лист <strong>«Сводка»</strong> — статистика звонков за сегодня, неделю, месяц и предыдущие месяцы (создаётся автоматически после первого обзвона)</li>
+    </ul>
+    <p>В файле <code>crm_with_results.xlsx</code> в папке <code>C:\obzvon</code> те же данные локально.</p>
+    <p style="margin-top:0.8rem;">Возможные значения в колонке «Результат обзвона»:</p>
+    <div class="notice info" style="margin-bottom:1rem; margin-top:0.5rem;"><span class="ico">📊</span><span>Открыть Google Таблицу: <a href="https://docs.google.com/spreadsheets/d/1SaECb7ZwekveMYviFUqW7e6eGjExr5U3Aloqkhxum9c/edit?gid=1342720212#gid=1342720212" target="_blank" style="color:#1a56db; font-weight:600;">Результаты обзвона Зикмес</a></span></div>
     <table class="data-table" style="margin-top:0.8rem;">
       <thead><tr><th>Значение</th><th>Что означает</th></tr></thead>
       <tbody>
@@ -572,8 +585,12 @@
       <thead><tr><th>Проблема</th><th>Решение</th></tr></thead>
       <tbody>
         <tr>
+          <td><strong>cannot find Chrome binary</strong></td>
+          <td>Не установлен Google Chrome. Скачай с <a href="https://www.google.com/chrome" target="_blank">google.com/chrome</a> и установи</td>
+        </tr>
+        <tr>
           <td><strong>Python не найден</strong></td>
-          <td>Скачай с python.org, при установке поставь галочку «Add Python to PATH», перезапусти START.bat</td>
+          <td>Скачай с python.org, при установке поставь галочку «Add Python to PATH» и нажми «Disable path length limit», перезапусти START.bat</td>
         </tr>
         <tr>
           <td><strong>FileNotFoundError: crm_orders.xlsx</strong></td>
