@@ -425,9 +425,12 @@
 
   <!-- ПОЛНЫЙ ЦИКЛ -->
   <div class="section">
-    <div class="section-title"><span class="icon">🔄</span> Полный цикл — пункт 5 меню</div>
-    <p>Самый простой способ: выбери <strong>пункт 5 — «ПОЛНЫЙ ЦИКЛ: пункты 1+2+3 подряд»</strong> и следуй подсказкам на экране.</p>
-    <div class="notice info" style="margin-bottom:1.2rem;"><span class="ico">⏱️</span><span>Весь цикл занимает около 20–30 минут. 15 минут из них скрипт ждёт завершения обзвона в МТС — обратный отсчёт виден в консоли.</span></div>
+    <div class="section-title"><span class="icon">🔄</span> Полный цикл — одна кнопка для всего</div>
+    <div class="notice ok" style="margin-bottom:1.2rem;">
+      <span class="ico">🚀</span>
+      <span>Самый простой способ — выбери <strong>пункт 5 — «ПОЛНЫЙ ЦИКЛ: пункты 1+2+3 подряд»</strong>. Он автоматически выгрузит заказы из CRM, запустит обзвон в МТС, подождёт завершения и загрузит результаты в Google Таблицу. Всё в одном действии.</span>
+    </div>
+    <div class="notice info" style="margin-bottom:1.2rem;"><span class="ico">⏱️</span><span>Весь цикл занимает около 20–30 минут. 15 минут из них скрипт автоматически ждёт завершения обзвона — обратный отсчёт виден в консоли. Браузер не закрывается между шагами — повторный вход не нужен.</span></div>
 
     <div class="steps">
       <div class="step-card">
@@ -521,6 +524,7 @@
   <!-- ПУНКТЫ МЕНЮ -->
   <div class="section">
     <div class="section-title"><span class="icon">🗂️</span> Пункты меню — что выбирать</div>
+    <p>При запуске <code>START.bat</code> появляется меню. Для обычной работы достаточно только пункта <strong>5</strong>. Остальные — если нужно запустить один конкретный шаг.</p>
     <table class="menu-table">
       <thead><tr><th style="width:60px;">Пункт</th><th>Что делает</th></tr></thead>
       <tbody>
@@ -528,7 +532,7 @@
         <tr><td><span class="menu-num">2</span></td><td>Запустить автообзвон в МТС (создать новое задание, загрузить номера)</td></tr>
         <tr><td><span class="menu-num">3</span></td><td>Скачать отчёт МТС и объединить с заказами CRM</td></tr>
         <tr><td><span class="menu-num">4</span></td><td>Объединить уже скачанный отчёт вручную (если пункт 3 не сработал)</td></tr>
-        <tr style="background:#eff6ff;"><td><span class="menu-num highlight">5 ★</span></td><td><strong>ПОЛНЫЙ ЦИКЛ: пункты 1+2+3 подряд</strong> — рекомендуется для обычной работы</td></tr>
+        <tr style="background:#eff6ff;"><td><span class="menu-num highlight">5 ★</span></td><td><strong>ПОЛНЫЙ ЦИКЛ — выгрузка из CRM + обзвон МТС + загрузка результатов</strong> — одна кнопка заменяет пункты 1, 2 и 3 подряд. Рекомендуется для ежедневной работы.</td></tr>
         <tr><td><span class="menu-num" style="background:var(--muted);">6</span></td><td>Выход</td></tr>
       </tbody>
     </table>
