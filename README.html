@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OK-CRM → Google Drive бот: инструкция</title>
+<style>
+  :root {
+    --text: #1f2328;
+    --muted: #57606a;
+    --bg: #ffffff;
+    --panel: #f6f8fa;
+    --border: #d0d7de;
+    --accent: #0969da;
+    --code-bg: #f6f8fa;
+    --warn-bg: #fff8e6;
+    --warn-border: #f2c94c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--panel);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.65;
+  }
+  .wrap {
+    max-width: 820px;
+    margin: 0 auto;
+    background: var(--bg);
+    padding: 48px 56px 72px;
+    min-height: 100vh;
+  }
+  h1 {
+    font-size: 1.7rem;
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 14px;
+    margin-bottom: 8px;
+  }
+  h2 {
+    font-size: 1.25rem;
+    margin-top: 2.4em;
+    padding-top: 0.4em;
+    border-top: 1px solid var(--border);
+  }
+  h3 {
+    font-size: 1.05rem;
+    margin-top: 1.8em;
+    color: var(--accent);
+  }
+  p { margin: 0.9em 0; }
+  ol, ul { padding-left: 1.4em; }
+  li { margin: 0.45em 0; }
+  code {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.15em 0.4em;
+    font-size: 0.88em;
+    font-family: "SF Mono", Consolas, "Courier New", monospace;
+  }
+  pre {
+    background: #0d1117;
+    color: #e6edf3;
+    border-radius: 8px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.55;
+  }
+  pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  strong { color: var(--text); }
+  .badge {
+    display: inline-block;
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-border);
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 0.8rem;
+    margin-right: 6px;
+  }
+  .intro {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin: 24px 0 8px;
+  }
+  @media (max-width: 640px) {
+    .wrap { padding: 28px 20px 48px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>OK-CRM → Google Drive бот: инструкция по установке и использованию</h1>
+<p>Бот автоматически обрабатывает замороженные заказы в рассрочку: генерирует
+платежи, скачивает документ, раскладывает его по нужным папкам на Google
+Drive, вставляет ссылку в заказ и переводит его в статус «Новый».</p>
+<h2>Что делает бот, по шагам</h2>
+<p>Для каждого подходящего заказа (статус «Заморожен», банк «Фирма рассрочка»,
+метод оплаты «Расчетный счет»):</p>
+<ol>
+<li>Читает цену, % первоначального взноса и текст пометки к заказу.</li>
+<li>Определяет сумму первого взноса — если в пометке явно написана сумма
+   («первоначальный взнос 1000», «предоплата 500», «аванс 300» и т.п. вариации)
+   — берёт её; если нет — считает по проценту от цены. Если не удалось
+   разобрать пометку однозначно — заказ пропускается и уходит в
+   <code>manual_review.csv</code> для ручной проверки, а не обрабатывается вслепую.</li>
+<li>Вписывает сумму в поле «1-ый взнос», жмёт «Генерировать платежи» (если
+   платежи для заказа уже есть — этот шаг пропускается, сайт сам блокирует
+   повторную генерацию).</li>
+<li>Через шестерёнку жмёт «Генерировать документы», скачивает получившийся
+   <code>.zip</code>, распаковывает из него <code>.docx</code>.</li>
+<li>На Google Drive заходит в <code>2026 Рассрочки → &lt;месяц&gt; → &lt;дата оформления&gt;</code>,
+   создаёт там папку <code>&lt;id заказа&gt; &lt;фамилия клиента&gt;</code> (если её ещё нет),
+   загружает туда <code>.docx</code>.</li>
+<li>Открывает редактирование заказа, дописывает в «Пометку к заказу» новую
+   строку со ссылкой на созданную папку и строкой «сделано!!», меняет статус
+   на «Новый», сохраняет.</li>
+</ol>
+<h2>Файлы проекта</h2>
+<pre><code>run_bot.bat              - двойной клик, чтобы просто запустить бота
+bot.py                   - основной скрипт
+config.py                - настройки (адрес CRM, ID папки Диска, пороги и т.п.)
+selectors.py              - селекторы элементов страницы CRM
+drive_browser.py          - управление Google Drive через браузер
+parse_notes.py             - разбор текста пометки на сумму взноса
+state_store.py             - локальная база учёта уже обработанных заказов
+storage_state.json         - СЕССИЯ ВХОДА (самый важный файл, см. ниже)
+requirements.txt            - список Python-зависимостей
+grab_session_from_cdp.py     - служебный скрипт захвата сессии (см. &quot;Если сессия слетела&quot;)
+manual_review.csv, errors.csv - журналы для проверки человеком (создаются автоматически)
+state.sqlite                - база &quot;уже обработанных&quot; заказов (создаётся автоматически)
+</code></pre>
+<p>Тестовые/вспомогательные скрипты (<code>test_*.py</code>, <code>import_cookies.py</code>,
+<code>convert_cookies.py</code>, <code>auth_login.py</code>) использовались только на этапе
+настройки, для повседневной работы не нужны, но можно оставить в папке -
+не мешают.</p>
+<h2>Повседневное использование (когда всё уже настроено)</h2>
+<p>Просто дважды кликните на <strong><code>run_bot.bat</code></strong>. Откроется чёрное окно консоли,
+бот сам активирует окружение и начнёт обработку. Браузер при этом <strong>не
+открывается на экране</strong> (работает в фоне) — это нормально, так и задумано,
+чтобы не мешать вам работать за компьютером.</p>
+<p>По завершении в окне появится строка вида:</p>
+<pre><code>Готово. Обработано за этот прогон: N
+</code></pre>
+<p>и окно будет ждать нажатия любой клавиши, чтобы вы успели прочитать результат.</p>
+<p><strong>Если заказов, подходящих под фильтр, больше 20</strong> (одна страница списка в
+CRM) — бот обработает только первые 20 за один запуск. Обработанные заказы
+меняют статус и перестают попадать под фильтр «Заморожен», поэтому просто
+<strong>запустите <code>run_bot.bat</code> ещё раз</strong> — на первой странице к этому моменту уже
+будут следующие заказы. Повторяйте, пока не увидите «Обработано за этот
+прогон: 0».</p>
+<p>После каждого прогона стоит заглянуть в:
+- <strong><code>manual_review.csv</code></strong> — заказы, где сумму взноса не удалось однозначно
+  определить по тексту пометки (пустая пометка, нестандартная формулировка,
+  или сумма из текста сильно разошлась с расчётом по проценту). Их нужно
+  обработать вручную или поправить пометку и запустить бота снова.
+- <strong><code>errors.csv</code></strong> — заказы, на которых бот столкнулся с технической ошибкой
+  (например, не удалось найти какой-то элемент на странице). Тоже требуют
+  ручного разбора.</p>
+<h2>Первоначальная настройка на новом компьютере</h2>
+<h3>1. Скопировать проект</h3>
+<p>Скопируйте всю папку с ботом на новый компьютер, <strong>кроме</strong> подпапки <code>venv</code>
+(она пересоздаётся заново на каждом компьютере отдельно, не переносится).
+Остальное - все <code>.py</code>/<code>.bat</code>/<code>.txt</code> файлы и, что особенно важно,
+<strong><code>storage_state.json</code></strong> - переносите как есть.</p>
+<h3>2. Установить Python</h3>
+<p>Проверьте в cmd:</p>
+<pre><code class="language-cmd">python --version
+</code></pre>
+<p>Если нет - установите с <a href="https://www.python.org/downloads/">python.org</a>,
+обязательно поставив галочку <strong>Add Python to PATH</strong> при установке.</p>
+<h3>3. Создать окружение и поставить зависимости</h3>
+<p>В папке проекта:</p>
+<pre><code class="language-cmd">python -m venv venv
+venv\Scripts\activate.bat
+pip install -r requirements.txt
+playwright install chromium
+</code></pre>
+<h3>4. Проверить, что сессия работает</h3>
+<pre><code class="language-cmd">python bot.py --dry-run --limit 1
+</code></pre>
+<p>Если видите вывод вида <code>[ID] сумма взноса = ... (источник: ...)</code> - всё
+работает, сессия перенеслась успешно. Если возникает ошибка входа - см.
+раздел ниже.</p>
+<h3>5. Дальше - обычное использование</h3>
+<p>Просто <code>run_bot.bat</code>, как описано выше.</p>
+<h2>Если сессия входа "слетела" (протухла)</h2>
+<p>Google-сессии не живут вечно. Если бот вдруг перестал заходить в CRM или на
+Диск (в логе видны ошибки входа/редиректы на страницу логина Google) -
+нужно заново захватить сессию:</p>
+<ol>
+<li>Полностью закройте все окна Chrome.</li>
+<li>Откройте новое окно cmd и выполните (путь может отличаться, если Chrome
+   установлен не в стандартную папку):</li>
+</ol>
+<pre><code class="language-cmd">&quot;C:\Program Files\Google\Chrome\Application\chrome.exe&quot; --remote-debugging-port=9222 --user-data-dir=&quot;C:\chrome-remote-profile&quot;
+</code></pre>
+<ol>
+<li>В открывшемся окне Chrome зайдите на <code>a.ok-crm.com</code> и на <code>drive.google.com</code>,
+   залогиньтесь через Google-аккаунт как обычно в обоих.</li>
+<li>Не закрывая это окно, в другом окне cmd (в папке проекта, с активным
+   <code>venv</code>):</li>
+</ol>
+<pre><code class="language-cmd">python grab_session_from_cdp.py
+</code></pre>
+<ol>
+<li>Должно вывестись <code>Успех: сессия (cookies + localStorage) сохранена в
+   storage_state.json</code>. Окно Chrome с отладочным портом после этого можно
+   закрыть.</li>
+<li>Проверьте: <code>python bot.py --dry-run --limit 1</code>.</li>
+</ol>
+<h2>Полезные флаги запуска (для отладки, не для повседневного использования)</h2>
+<pre><code class="language-cmd">python bot.py --dry-run              REM ничего не менять, только показать план
+python bot.py --dry-run --limit 1    REM то же самое, но только для одного заказа
+python bot.py --order-id 593570      REM обработать только конкретный заказ по ID
+python bot.py --headed               REM показать окно браузера вживую (без ускоренного режима)
+python bot.py --headed --pause       REM показать браузер и делать паузу после каждого заказа - для пошагового наблюдения
+</code></pre>
+<p>Обычный <code>run_bot.bat</code> эквивалентен запуску <code>python bot.py</code> без флагов -
+боевой режим, без окна браузера, без пауз.</p>
+<h2>Известные особенности и ограничения</h2>
+<ul>
+<li><strong>Разбор пометки к заказу</strong>: список распознаваемых формулировок суммы
+  взноса можно расширять в <code>parse_notes.py</code> (переменная <code>_PATTERNS</code>), если
+  появятся новые варианты, которые бот не распознаёт - такие заказы будут
+  попадать в <code>manual_review.csv</code>, это ожидаемо и безопасно (лучше пропустить
+  и попросить проверить вручную, чем угадать неверно).</li>
+<li><strong>Google Drive использует обычный веб-интерфейс</strong> (не API) - тем же
+  браузером и той же сессией, что и CRM. Если Google обновит вёрстку своего
+  интерфейса, некоторые селекторы в <code>drive_browser.py</code> могут перестать
+  работать - тогда потребуется заново снять актуальные селекторы (см. историю
+  настройки, метод через <code>playwright codegen</code>).</li>
+<li><strong>Пагинация списка заказов не используется</strong> - бот всегда работает только
+  с первой страницей списка и рассчитывает на то, что обработанные заказы
+  сами "уходят" из фильтра «Заморожен», освобождая место для следующих. Если
+  фильтр в CRM когда-либо изменится так, что обработанные заказы перестанут
+  выпадать из выборки - потребуется пересмотреть эту логику.</li>
+</ul>
+</div>
+</body>
+</html>
