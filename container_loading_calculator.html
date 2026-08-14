@@ -975,17 +975,18 @@ function renderVehicleSVG(result){
 function renderUnfitVolumeSVG(vehicle, unfitVolM3){
   const cubeSide = Math.cbrt(Math.max(unfitVolM3, 0.001) * 1e6); // cm
   const L = vehicle.l, W = vehicle.w, H = vehicle.h;
-  const gap = Math.max(L,W,H) * 0.18;
-  const totalL = L + gap + cubeSide;
-  const totalW = Math.max(W, cubeSide);
-  const totalH = Math.max(H, cubeSide);
 
-  const viewW = 560, viewH = 240;
-  const marginL=26, marginT=26, marginR=26, marginB=34;
+  const viewW = 560, viewH = 260;
+  const marginL=30, marginT=30, marginR=30, marginB=34;
   const drawW = viewW-marginL-marginR, drawH = viewH-marginT-marginB;
   const sinA=0.5, cosA=0.866;
-  const neededWidthUnits = (totalL+totalW)*cosA;
-  const neededHeightUnits = (totalL+totalW)*sinA + totalH;
+  // Bounding box covers BOTH the vehicle body and the cube (they share the same origin —
+  // the cube sits at the loading corner, same as cargo normally does), so if the leftover
+  // volume is larger than the body itself, the whole scene still scales down to fit rather
+  // than clipping off-canvas.
+  const boxL = Math.max(L, cubeSide), boxW = Math.max(W, cubeSide), boxH = Math.max(H, cubeSide);
+  const neededWidthUnits = (boxL+boxW)*cosA;
+  const neededHeightUnits = (boxL+boxW)*sinA + boxH;
   const s = Math.min(drawW/neededWidthUnits, drawH/neededHeightUnits);
 
   function rawProj(x,y,z){ return [ (x-z)*cosA*s, (x+z)*sinA*s - y*s ]; }
@@ -996,7 +997,7 @@ function renderUnfitVolumeSVG(vehicle, unfitVolM3){
     });
   }
   pushCorners(0,L,0,H,0,W);
-  pushCorners(L+gap, L+gap+cubeSide, 0, cubeSide, 0, cubeSide);
+  pushCorners(0,cubeSide,0,cubeSide,0,cubeSide);
   const xs=corners.map(c=>c[0]), ys=corners.map(c=>c[1]);
   const minX=Math.min(...xs), maxX=Math.max(...xs), minY=Math.min(...ys), maxY=Math.max(...ys);
   const offsetX = marginL + (drawW-(maxX-minX))/2 - minX;
@@ -1020,25 +1021,27 @@ function renderUnfitVolumeSVG(vehicle, unfitVolM3){
     const E_=proj(x0,y0,z0), F_=proj(x1,y0,z0), G_=proj(x1,y0,z1);
     const pts=p=>p.map(v=>v.toFixed(1)).join(',');
     let s2='';
-    s2+=`<polygon points="${pts(B_)} ${pts(C_)} ${pts(G_)} ${pts(F_)}" fill="#b84a35" stroke="#7a2618" stroke-width="0.8"/>`;
-    s2+=`<polygon points="${pts(A_)} ${pts(B_)} ${pts(F_)} ${pts(E_)}" fill="#dd6a52" stroke="#7a2618" stroke-width="0.8"/>`;
-    s2+=`<polygon points="${pts(A_)} ${pts(B_)} ${pts(C_)} ${pts(D_)}" fill="#f0a898" stroke="#7a2618" stroke-width="0.8"/>`;
+    s2+=`<polygon points="${pts(B_)} ${pts(C_)} ${pts(G_)} ${pts(F_)}" fill="#b84a35" fill-opacity="0.88" stroke="#7a2618" stroke-width="0.8"/>`;
+    s2+=`<polygon points="${pts(A_)} ${pts(B_)} ${pts(F_)} ${pts(E_)}" fill="#dd6a52" fill-opacity="0.88" stroke="#7a2618" stroke-width="0.8"/>`;
+    s2+=`<polygon points="${pts(A_)} ${pts(B_)} ${pts(C_)} ${pts(D_)}" fill="#f0a898" fill-opacity="0.88" stroke="#7a2618" stroke-width="0.8"/>`;
     return s2;
   }
 
   let svg = `<svg viewBox="0 0 ${viewW} ${viewH}" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Mono, monospace">`;
-  svg += wireframe(0,L,0,H,0,W, '#b7bfb3');
-  svg += filledCuboid(L+gap, L+gap+cubeSide, 0, cubeSide, 0, cubeSide);
+  // cube drawn first so the vehicle's wireframe edges stay visible on top of it
+  svg += filledCuboid(0, cubeSide, 0, cubeSide, 0, cubeSide);
+  svg += wireframe(0,L,0,H,0,W, '#5c655c');
 
-  const vehLabelPos = proj(L/2, 0, W);
-  svg += `<text x="${vehLabelPos[0].toFixed(1)}" y="${(vehLabelPos[1]+18).toFixed(1)}" font-size="10.5" fill="#8a938a" text-anchor="middle">кузов ${(L/100).toFixed(2)}×${(W/100).toFixed(2)}×${(H/100).toFixed(2)} м</text>`;
-  const cubeLabelPos = proj(L+gap+cubeSide/2, 0, cubeSide);
-  svg += `<text x="${cubeLabelPos[0].toFixed(1)}" y="${(cubeLabelPos[1]+18).toFixed(1)}" font-size="10.5" fill="#b84a35" font-weight="700" text-anchor="middle">≈ ${(cubeSide/100).toFixed(2)}×${(cubeSide/100).toFixed(2)}×${(cubeSide/100).toFixed(2)} м</text>`;
-  svg += `<text x="${cubeLabelPos[0].toFixed(1)}" y="${(cubeLabelPos[1]+31).toFixed(1)}" font-size="10.5" fill="#b84a35" text-anchor="middle">(${unfitVolM3.toFixed(2)} м³)</text>`;
+  const vehLabelPos = proj(L, H, W/2);
+  svg += `<text x="${vehLabelPos[0].toFixed(1)}" y="${(vehLabelPos[1]-8).toFixed(1)}" font-size="10.5" fill="#5c655c" text-anchor="middle">кузов ${(L/100).toFixed(2)}×${(W/100).toFixed(2)}×${(H/100).toFixed(2)} м</text>`;
+  const cubeLabelPos = proj(cubeSide/2, cubeSide, cubeSide/2);
+  svg += `<text x="${cubeLabelPos[0].toFixed(1)}" y="${(cubeLabelPos[1]-10).toFixed(1)}" font-size="10.5" fill="#7a2618" font-weight="700" text-anchor="middle">не поместилось ≈ ${(cubeSide/100).toFixed(2)}×${(cubeSide/100).toFixed(2)}×${(cubeSide/100).toFixed(2)} м</text>`;
+  svg += `<text x="${cubeLabelPos[0].toFixed(1)}" y="${(cubeLabelPos[1]-23).toFixed(1)}" font-size="10.5" fill="#7a2618" text-anchor="middle">(${unfitVolM3.toFixed(2)} м³)</text>`;
 
   svg += `</svg>`;
   return svg;
 }
+
 
 function niceStep(range){
   const raw = range/8;
