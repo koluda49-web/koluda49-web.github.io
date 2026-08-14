@@ -925,13 +925,14 @@ function renderVehicleSVG(result){
     return s;
   }
 
+  const UNFIT_COLORS = { top:'#f0a898', front:'#dd6a52', side:'#b84a35' };
+
   let cursor = 0;
   const MAX_LAYERS_DRAWN = 40; // cap per item so very high box counts stay readable
   placements.forEach((p, idx)=>{
     if(!p.ori || p.placed===0) { cursor += p.segmentLength||0; return; }
     const fw = p.footprintW, fh = p.footprintH, depth = p.ori.depth;
-    const colorIdx = (p.item._colorIdx ?? idx) % PALETTE.length;
-    const colors = PALETTE[colorIdx];
+    const colors = p.item._colorIdx === 'unfit' ? UNFIT_COLORS : PALETTE[(p.item._colorIdx ?? idx) % PALETTE.length];
     const layersToDraw = Math.min(p.layersUsed, MAX_LAYERS_DRAWN);
     for(let l=0; l<layersToDraw; l++){
       const x0 = cursor + l*depth, x1 = x0 + depth;
@@ -973,75 +974,27 @@ function renderVehicleSVG(result){
 // Draws the vehicle's outline next to a filled cube whose volume equals the cargo that
 // didn't fit — same isometric scale for both, so the size difference is visually obvious.
 function renderUnfitVolumeSVG(vehicle, unfitVolM3){
-  const cubeSide = Math.cbrt(Math.max(unfitVolM3, 0.001) * 1e6); // cm
   const L = vehicle.l, W = vehicle.w, H = vehicle.h;
+  // Represent the unfit volume as a block with the SAME cross-section as the vehicle body
+  // (so it can never be wider/taller than the body) and only as long as needed — capped at
+  // the body's own length so it never draws past the vehicle's own boundary either.
+  const requiredLength = (Math.max(unfitVolM3,0) * 1e6) / (W*H);
+  const drawnLength = Math.min(requiredLength, L);
+  const cappedNote = requiredLength > L
+    ? ` Показан не весь объём — он больше вместимости одного кузова этого типа (потребовалось бы ${(requiredLength/L).toFixed(1)}× по длине).`
+    : '';
 
-  const viewW = 560, viewH = 260;
-  const marginL=30, marginT=30, marginR=30, marginB=34;
-  const drawW = viewW-marginL-marginR, drawH = viewH-marginT-marginB;
-  const sinA=0.5, cosA=0.866;
-  // Bounding box covers BOTH the vehicle body and the cube (they share the same origin —
-  // the cube sits at the loading corner, same as cargo normally does), so if the leftover
-  // volume is larger than the body itself, the whole scene still scales down to fit rather
-  // than clipping off-canvas.
-  const boxL = Math.max(L, cubeSide), boxW = Math.max(W, cubeSide), boxH = Math.max(H, cubeSide);
-  const neededWidthUnits = (boxL+boxW)*cosA;
-  const neededHeightUnits = (boxL+boxW)*sinA + boxH;
-  const s = Math.min(drawW/neededWidthUnits, drawH/neededHeightUnits);
+  const fakeItem = { name:'не поместилось', l:drawnLength, w:W, h:H, _colorIdx:'unfit' };
+  const fakePlacement = {
+    item: fakeItem, placed: 1,
+    ori: { depth: drawnLength, fw: W, fh: H, nx:1, ny:1 },
+    layersUsed: 1, segmentLength: drawnLength,
+    footprintW: W, footprintH: H,
+  };
+  const fakeUnit = { vehicle, placements:[fakePlacement], leftoverLength: Math.max(0, L-drawnLength) };
 
-  function rawProj(x,y,z){ return [ (x-z)*cosA*s, (x+z)*sinA*s - y*s ]; }
-  const corners = [];
-  function pushCorners(x0,x1,y0,y1,z0,z1){
-    [[x0,y0,z0],[x1,y0,z0],[x0,y1,z0],[x1,y1,z0],[x0,y0,z1],[x1,y0,z1],[x0,y1,z1],[x1,y1,z1]].forEach(([x,y,z])=>{
-      corners.push(rawProj(x,y,z));
-    });
-  }
-  pushCorners(0,L,0,H,0,W);
-  pushCorners(0,cubeSide,0,cubeSide,0,cubeSide);
-  const xs=corners.map(c=>c[0]), ys=corners.map(c=>c[1]);
-  const minX=Math.min(...xs), maxX=Math.max(...xs), minY=Math.min(...ys), maxY=Math.max(...ys);
-  const offsetX = marginL + (drawW-(maxX-minX))/2 - minX;
-  const offsetY = marginT + (drawH-(maxY-minY))/2 - minY;
-  function proj(x,y,z){ const [rx,ry]=rawProj(x,y,z); return [rx+offsetX, ry+offsetY]; }
-
-  function wireframe(x0,x1,y0,y1,z0,z1,color){
-    const c = {
-      A: proj(x0,y1,z0), B: proj(x1,y1,z0), C: proj(x1,y1,z1), D: proj(x0,y1,z1),
-      E: proj(x0,y0,z0), F: proj(x1,y0,z0), G: proj(x1,y0,z1), Hh: proj(x0,y0,z1),
-    };
-    const edges = [['A','B'],['B','C'],['C','D'],['D','A'],['E','F'],['F','G'],['G','Hh'],['Hh','E'],['A','E'],['B','F'],['C','G'],['D','Hh']];
-    let s2='';
-    edges.forEach(([p1,p2])=>{
-      s2 += `<line x1="${c[p1][0].toFixed(1)}" y1="${c[p1][1].toFixed(1)}" x2="${c[p2][0].toFixed(1)}" y2="${c[p2][1].toFixed(1)}" stroke="${color}" stroke-width="1.3"/>`;
-    });
-    return s2;
-  }
-  function filledCuboid(x0,x1,y0,y1,z0,z1){
-    const A_=proj(x0,y1,z0), B_=proj(x1,y1,z0), C_=proj(x1,y1,z1), D_=proj(x0,y1,z1);
-    const E_=proj(x0,y0,z0), F_=proj(x1,y0,z0), G_=proj(x1,y0,z1);
-    const pts=p=>p.map(v=>v.toFixed(1)).join(',');
-    let s2='';
-    s2+=`<polygon points="${pts(B_)} ${pts(C_)} ${pts(G_)} ${pts(F_)}" fill="#b84a35" fill-opacity="0.88" stroke="#7a2618" stroke-width="0.8"/>`;
-    s2+=`<polygon points="${pts(A_)} ${pts(B_)} ${pts(F_)} ${pts(E_)}" fill="#dd6a52" fill-opacity="0.88" stroke="#7a2618" stroke-width="0.8"/>`;
-    s2+=`<polygon points="${pts(A_)} ${pts(B_)} ${pts(C_)} ${pts(D_)}" fill="#f0a898" fill-opacity="0.88" stroke="#7a2618" stroke-width="0.8"/>`;
-    return s2;
-  }
-
-  let svg = `<svg viewBox="0 0 ${viewW} ${viewH}" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Mono, monospace">`;
-  // cube drawn first so the vehicle's wireframe edges stay visible on top of it
-  svg += filledCuboid(0, cubeSide, 0, cubeSide, 0, cubeSide);
-  svg += wireframe(0,L,0,H,0,W, '#5c655c');
-
-  const vehLabelPos = proj(L, H, W/2);
-  svg += `<text x="${vehLabelPos[0].toFixed(1)}" y="${(vehLabelPos[1]-8).toFixed(1)}" font-size="10.5" fill="#5c655c" text-anchor="middle">кузов ${(L/100).toFixed(2)}×${(W/100).toFixed(2)}×${(H/100).toFixed(2)} м</text>`;
-  const cubeLabelPos = proj(cubeSide/2, cubeSide, cubeSide/2);
-  svg += `<text x="${cubeLabelPos[0].toFixed(1)}" y="${(cubeLabelPos[1]-10).toFixed(1)}" font-size="10.5" fill="#7a2618" font-weight="700" text-anchor="middle">не поместилось ≈ ${(cubeSide/100).toFixed(2)}×${(cubeSide/100).toFixed(2)}×${(cubeSide/100).toFixed(2)} м</text>`;
-  svg += `<text x="${cubeLabelPos[0].toFixed(1)}" y="${(cubeLabelPos[1]-23).toFixed(1)}" font-size="10.5" fill="#7a2618" text-anchor="middle">(${unfitVolM3.toFixed(2)} м³)</text>`;
-
-  svg += `</svg>`;
-  return svg;
+  return { svg: renderVehicleSVG(fakeUnit), cappedNote };
 }
-
 
 function niceStep(range){
   const raw = range/8;
@@ -1310,6 +1263,7 @@ function renderResults(results, items){
       const unfitPct = 100 - placedPct;
       const vehicleVolM3 = r.vehicle.l*r.vehicle.w*r.vehicle.h/1e6;
       const extraUnitsEstimate = vehicleVolM3 ? Math.ceil(totalUnfitVolM3/vehicleVolM3) : null;
+      const unfitViz = renderUnfitVolumeSVG(r.vehicle, totalUnfitVolM3);
 
       unfitHtml = `
       <div class="unfit-panel">
@@ -1325,8 +1279,8 @@ function renderResults(results, items){
         </div>
 
         <div class="unfit-viz-wrap">
-          <div class="unfit-viz-caption">Для наглядности: куб такого объёма рядом с кузовом</div>
-          ${renderUnfitVolumeSVG(r.vehicle, totalUnfitVolM3)}
+          <div class="unfit-viz-caption">Для наглядности: этот же объём внутри кузова (сплошной блок той же ширины/высоты).${unfitViz.cappedNote}</div>
+          ${unfitViz.svg}
         </div>
 
         <table class="res-table">
