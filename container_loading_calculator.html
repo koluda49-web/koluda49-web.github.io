@@ -136,6 +136,21 @@
   .util-bar{ height:7px; border-radius:4px; background:#e6e9e3; overflow:hidden; width:120px;}
   .util-bar > div{ height:100%; background:var(--teal);}
 
+  .unfit-panel{
+    border:1.5px solid #f0c6bc; background:#fdf6f3; border-radius:8px; padding:14px 16px; margin-bottom:16px;
+  }
+  .unfit-title{ font-weight:700; color:var(--red); font-size:14px; margin-bottom:10px;}
+  .vol-bar{ height:14px; border-radius:7px; overflow:hidden; display:flex; background:#eee; margin-bottom:6px;}
+  .vol-bar-placed{ height:100%; background:var(--teal);}
+  .vol-bar-unfit{ height:100%; background:var(--red);}
+  .vol-bar-legend{ display:flex; gap:18px; font-size:12.5px; color:var(--ink-soft); margin-bottom:12px;}
+  .vol-bar-legend span{ display:inline-flex; align-items:center; gap:6px;}
+  .vol-dot{ width:9px; height:9px; border-radius:50%; display:inline-block;}
+  .vol-dot.placed{ background:var(--teal);}
+  .vol-dot.unfit{ background:var(--red);}
+  .unfit-panel .res-table{ margin:0;}
+  .unfit-panel .res-table th, .unfit-panel .res-table td{ padding:6px 8px;}
+
   .viz-wrap{ background:#fbfbfa; border:1px solid var(--line); border-radius:8px; padding:6px; overflow-x:auto;}
   .viz-row{ display:flex; gap:14px; align-items:stretch;}
   .viz-row .viz-wrap{ flex:1; min-width:0;}
@@ -1202,6 +1217,53 @@ function renderResults(results, items){
       ? (r.unitsUsed<r.unitCount ? `использовано ${r.unitsUsed} из ${r.unitCount} ед.` : `задействованы все ${r.unitCount} ед.`)
       : null;
 
+    // What didn't fit at all, even after using every allotted unit of this vehicle type.
+    const placedByName = {};
+    r.units.forEach(u=> u.placements.forEach(p=>{ placedByName[p.item.name] = (placedByName[p.item.name]||0) + p.placed; }));
+    const unfit = items.map(it=>{
+      const placed = placedByName[it.name]||0;
+      return { item: it, unfitQty: Math.max(0, it.qty - placed) };
+    }).filter(x=>x.unfitQty>0);
+
+    let unfitHtml = '';
+    if(unfit.length){
+      const totalRequestedVolM3 = items.reduce((s,it)=> s + it.qty*it.l*it.w*it.h/1e6, 0);
+      const totalUnfitVolM3 = unfit.reduce((s,x)=> s + x.unfitQty*x.item.l*x.item.w*x.item.h/1e6, 0);
+      const totalUnfitWeight = unfit.reduce((s,x)=> s + x.unfitQty*(x.item.weight||0), 0);
+      const placedVolM3 = Math.max(0, totalRequestedVolM3 - totalUnfitVolM3);
+      const placedPct = totalRequestedVolM3 ? (placedVolM3/totalRequestedVolM3*100) : 0;
+      const unfitPct = 100 - placedPct;
+      const vehicleVolM3 = r.vehicle.l*r.vehicle.w*r.vehicle.h/1e6;
+      const extraUnitsEstimate = vehicleVolM3 ? Math.ceil(totalUnfitVolM3/vehicleVolM3) : null;
+
+      unfitHtml = `
+      <div class="unfit-panel">
+        <div class="unfit-title">⚠️ Не поместилось — ${r.totalRequested-r.totalPlaced} шт.</div>
+
+        <div class="vol-bar" title="Размещено ${placedVolM3.toFixed(2)} м³ · не поместилось ${totalUnfitVolM3.toFixed(2)} м³">
+          <div class="vol-bar-placed" style="width:${placedPct.toFixed(1)}%"></div>
+          <div class="vol-bar-unfit" style="width:${unfitPct.toFixed(1)}%"></div>
+        </div>
+        <div class="vol-bar-legend">
+          <span><i class="vol-dot placed"></i>размещено: ${placedVolM3.toFixed(2)} м³</span>
+          <span><i class="vol-dot unfit"></i>не поместилось: ${totalUnfitVolM3.toFixed(2)} м³</span>
+        </div>
+
+        <table class="res-table">
+          <thead><tr><th>Товар</th><th>Не поместилось, шт</th><th>Объём</th>${totalUnfitWeight>0?'<th>Вес</th>':''}</tr></thead>
+          <tbody>
+          ${unfit.map(x=>{
+            const volEach = x.item.l*x.item.w*x.item.h/1e6;
+            const vol = volEach*x.unfitQty;
+            const w = x.unfitQty*(x.item.weight||0);
+            return `<tr><td>${escapeHtml(x.item.name)}</td><td>${x.unfitQty}</td><td class="mono">${vol.toFixed(2)} м³</td>${totalUnfitWeight>0?`<td class="mono">${w.toFixed(0)} кг</td>`:''}</tr>`;
+          }).join('')}
+          </tbody>
+        </table>
+        <p class="note" style="margin:8px 0 0;">Итого не поместилось: <b>${totalUnfitVolM3.toFixed(2)} м³</b>${totalUnfitWeight>0?`, <b>${totalUnfitWeight.toFixed(0)} кг</b>`:''}${extraUnitsEstimate ? ` — грубо говоря, нужно ещё примерно ${extraUnitsEstimate} ед. такого же транспорта (прикидка по объёму, не точная раскладка).` : ''}</p>
+      </div>`;
+    }
+
     return `
     <div class="result-card">
       <div class="result-head">
@@ -1219,6 +1281,7 @@ function renderResults(results, items){
         ${r.totalWeight>0 ? `<div class="stat"><b>${r.totalWeight.toFixed(0)} кг</b><span>расчётный вес груза</span></div>` : ''}
       </div>
 
+      ${unfitHtml}
       ${unitsHtml}
     </div>`;
   }).join('');
