@@ -29,7 +29,7 @@
   }
   h1,h2,h3{ font-family:'Space Grotesk',sans-serif; margin:0; letter-spacing:-.01em;}
   .mono{ font-family:'IBM Plex Mono',monospace; }
-  .wrap{ max-width:1180px; margin:0 auto; padding:0 24px;}
+  .wrap{ max-width:1320px; margin:0 auto; padding:0 24px;}
 
   header.top{
     background:var(--ink); color:#fff; padding:28px 0 24px;
@@ -154,13 +154,27 @@
   .unfit-viz-caption{ font-size:11.5px; color:var(--ink-soft); text-align:center; margin-bottom:2px;}
 
   .viz-wrap{ background:#fbfbfa; border:1px solid var(--line); border-radius:8px; padding:6px; overflow-x:auto;}
-  .viz-row{ display:flex; gap:14px; align-items:stretch;}
-  .viz-row .viz-wrap{ flex:1; min-width:0;}
-  .viz-legend{ width:190px; flex-shrink:0; background:#fbfbfa; border:1px solid var(--line); border-radius:8px; padding:12px; font-size:12.5px;}
-  .viz-legend-title{ font-family:'IBM Plex Mono',monospace; font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--ink-soft); margin-bottom:9px;}
-  .viz-legend-row{ display:flex; align-items:center; gap:8px; margin-bottom:8px; line-height:1.3;}
+  .viz-row{ display:block;}
+  .viz-row .viz-wrap{ width:100%;}
+  .viz-legend{ margin-top:10px; display:flex; flex-wrap:wrap; align-items:center; gap:8px 18px; background:#fbfbfa; border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-size:12.5px;}
+  .viz-legend-title{ font-family:'IBM Plex Mono',monospace; font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--ink-soft); margin:0;}
+  .viz-legend-row{ display:flex; align-items:center; gap:8px; margin:0; line-height:1.3;}
   .viz-legend-swatch{ width:13px; height:13px; border-radius:3px; flex-shrink:0;}
-  @media (max-width:720px){ .viz-row{ flex-direction:column;} .viz-legend{ width:auto;} }
+  .viz-box{ cursor:grab;}
+  .viz-box.selected polygon{ stroke:#c0392b; stroke-width:2;}
+  .viz-box.dragging{ cursor:grabbing; opacity:.85;}
+  .viz-box.invalid polygon{ fill:#e06a5a;}
+  .viz-tools{ margin-top:10px; background:#fbfbfa; border:1px solid var(--line); border-radius:8px; padding:12px;}
+  .viz-tools-hint{ font-size:12.5px; color:var(--ink-soft); margin-bottom:8px;}
+  .viz-tools-sel{ font-size:13px; margin-bottom:9px;}
+  .viz-tools-btns{ display:flex; flex-wrap:wrap; gap:8px; align-items:center;}
+  .viz-btn{ font-family:inherit; font-size:12.5px; padding:6px 12px; border:1px solid var(--line); border-radius:6px; background:#fff; cursor:pointer;}
+  .viz-btn:hover:not(:disabled){ background:#f0f1ee;}
+  .viz-btn:disabled{ opacity:.45; cursor:default;}
+  .viz-btn.ghost{ margin-left:auto;}
+  .viz-tools-msg{ margin-top:8px; font-size:12.5px; color:var(--amber-dark); min-height:16px;}
+  .upright-check + .upright-check{ margin-top:6px;}
+  @media (max-width:720px){ .viz-btn.ghost{ margin-left:0;} }
 
   .stats-strip{ display:flex; gap:22px; flex-wrap:wrap; margin:10px 0 4px; font-size:13px;}
   .stats-strip .stat b{ display:block; font-size:19px; font-family:'IBM Plex Mono',monospace; color:var(--ink);}
@@ -186,7 +200,7 @@
   .note{ font-size:12.5px; color:var(--ink-soft); margin-top:8px;}
   .warn-inline{ background:#fdeeea; border:1px solid #f0c6bc; color:#8a3223; padding:10px 12px; border-radius:6px; font-size:13px; margin-top:10px;}
 
-  footer{ text-align:center; padding:34px 24px 24px; color:var(--ink-soft); font-size:12.5px; max-width:1180px; margin:0 auto;}
+  footer{ text-align:center; padding:34px 24px 24px; color:var(--ink-soft); font-size:12.5px; max-width:1320px; margin:0 auto;}
   .footer-inner{ display:flex; justify-content:center; align-items:center; gap:18px; flex-wrap:wrap;}
   .footer-link{ color:var(--teal-dark); font-weight:600; text-decoration:none;}
   .footer-link:hover{ text-decoration:underline;}
@@ -592,7 +606,7 @@ document.getElementById('prevRouteLoadBtn').onclick = ()=>{
 function addRowSilent(prefill){
   const id = ++boxRowSeq;
   boxRows.push(Object.assign({
-    id, mode:'manual', name:'', l:'', w:'', h:'', weight:'', qty:1, catalogIndex:-1, upright:true
+    id, mode:'manual', name:'', l:'', w:'', h:'', weight:'', qty:1, catalogIndex:-1, upright:true, noGoOnTop:false, noSupport:false
   }, prefill||{}));
 }
 function addRow(prefill){
@@ -660,6 +674,14 @@ function renderRows(){
         <input type="checkbox" class="f-upright" data-id="${r.id}" ${r.upright!==false?'checked':''}>
         Не ставить на торец/бок — грузить как обычно (высота остаётся высотой)
       </label>
+      <label class="upright-check">
+        <input type="checkbox" class="f-nogoontop" data-id="${r.id}" ${r.noGoOnTop?'checked':''}>
+        Только на пол — нельзя ставить поверх другого груза (паллета, тяжёлое)
+      </label>
+      <label class="upright-check">
+        <input type="checkbox" class="f-nosupport" data-id="${r.id}" ${r.noSupport?'checked':''}>
+        Ничего не класть сверху — хрупкое, нагружать нельзя
+      </label>
     </div>`;
   }).join('');
 
@@ -677,6 +699,8 @@ function renderRows(){
   wrap.querySelectorAll('.f-weight').forEach(i=> i.oninput = ()=> updateRow(+i.dataset.id,{weight:+i.value}));
   wrap.querySelectorAll('.f-qty').forEach(i=> i.oninput = ()=> updateRow(+i.dataset.id,{qty:Math.max(1,+i.value||1)}));
   wrap.querySelectorAll('.f-upright').forEach(i=> i.onchange = ()=> updateRow(+i.dataset.id,{upright:i.checked}));
+  wrap.querySelectorAll('.f-nogoontop').forEach(i=> i.onchange = ()=> updateRow(+i.dataset.id,{noGoOnTop:i.checked}));
+  wrap.querySelectorAll('.f-nosupport').forEach(i=> i.onchange = ()=> updateRow(+i.dataset.id,{noSupport:i.checked}));
   wrap.querySelectorAll('.f-catalog').forEach(i=> i.onchange = ()=>{
     const idx = +i.value;
     const c = idx>=0 ? CATALOG[idx] : null;
@@ -721,80 +745,491 @@ function renderVehicleList(){
   });
 }
 
-/* ========================= PACKING ALGORITHM ========================= */
-function bestOrientation(l, w, h, W, H, availableLength, upright){
-  let axisChoices;
-  if(upright){
-    // Keep the item's own height (h) as the vertical axis — only rotate around the vertical
-    // axis (swap which horizontal side faces "into" the container). No tipping onto a side/end.
-    axisChoices = [
-      { depth:l, foot:[w,h] },
-      { depth:w, foot:[l,h] },
-    ];
-  } else {
-    axisChoices = [
-      { depth:l, foot:[w,h] },
-      { depth:w, foot:[l,h] },
-      { depth:h, foot:[l,w] },
-    ];
-  }
-  let best = null;
-  axisChoices.forEach(({depth,foot})=>{
-    const swaps = upright ? [[foot[0],foot[1]]] : [[foot[0],foot[1]],[foot[1],foot[0]]];
-    swaps.forEach(([fw,fh])=>{
-      if(fw<=0||fh<=0||depth<=0) return;
-      const nx = Math.floor(W/fw), ny = Math.floor(H/fh);
-      if(nx>=1 && ny>=1){
-        const layers = Math.floor(availableLength/depth);
-        const count = layers*nx*ny;
-        if(!best || count>best.count || (count===best.count && depth<best.depth)){
-          best = { depth, fw, fh, nx, ny, layers, count };
-        }
-      }
-    });
+/* ========================= PACKING ALGORITHM (3D) =========================
+   Real 3D packing: every single box gets its own (x,y,z) position inside the body, so
+   products can stand on top of each other. The previous version gave each product an
+   exclusive slice of the body length, which made stacking impossible and drew one solid
+   floor-to-ceiling block even when only a few boxes were actually loaded.
+
+   Axes: x = along the body length, y = height, z = across the width.
+   Placement rule is "lowest, then closest to the front wall, then leftmost", so the floor
+   fills up before anything gets stacked on top of it.                                    */
+
+const SUPPORT_RATIO = 0.7;         // share of a box's bottom that must rest on something
+const PACK_EPS = 0.001;
+const PACK_TIME_BUDGET_MS = 2000;  // hard stop so a huge order can never freeze the browser
+const PACK_RETRY_BUDGET_MS = 1000; // the box-by-box second opinion gets a shorter leash
+
+function packNow(){ return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); }
+
+// Every way the item may be turned, as [dx, dy, dz] = [along length, height, across width].
+// With `upright` the item's own height stays vertical — only rotation around the vertical axis.
+function orientationsFor(item){
+  const { l, w, h } = item;
+  const all = [
+    [l, h, w], [w, h, l],   // own height stays vertical
+    [l, w, h], [h, w, l],   // tipped onto a side
+    [h, l, w], [w, l, h],   // stood on an end
+  ];
+  const list = item.upright !== false ? all.slice(0, 2) : all;
+  const seen = {};
+  const out = [];
+  list.forEach(([dx,dy,dz])=>{
+    const key = dx+'|'+dy+'|'+dz;
+    if(seen[key]) return;
+    seen[key] = 1;
+    out.push({ dx, dy, dz });
   });
+  return out;
+}
+
+// Holds the boxes already placed in one body, bucketed along the length so a collision or
+// support check only looks at nearby boxes instead of scanning the whole load.
+const PACK_BUCKET = 100; // cm
+function makeSpace(vehicle){
+  return {
+    L: vehicle.l, H: vehicle.h, W: vehicle.w,
+    boxes: [],
+    buckets: {},
+    bucketKeys(x0, x1){
+      const out = [];
+      const from = Math.floor(Math.max(0, x0) / PACK_BUCKET);
+      const to = Math.floor(Math.max(0, Math.max(x0, x1 - PACK_EPS)) / PACK_BUCKET);
+      for(let b = from; b <= to; b++) out.push(b);
+      return out;
+    },
+    add(box){
+      this.boxes.push(box);
+      this.bucketKeys(box.x, box.x + box.dx).forEach(k=>{
+        (this.buckets[k] || (this.buckets[k] = [])).push(box);
+      });
+    },
+    near(x0, x1){
+      const seen = {}, out = [];
+      this.bucketKeys(x0, x1).forEach(k=>{
+        (this.buckets[k] || []).forEach(b=>{ if(!seen[b.id]){ seen[b.id] = 1; out.push(b); } });
+      });
+      return out;
+    },
+  };
+}
+
+function span1(a0, a1, b0, b1){ return a0 < b1 - PACK_EPS && b0 < a1 - PACK_EPS; }
+
+function packCollides(space, x, y, z, dx, dy, dz, ignoreId){
+  const list = space.near(x, x + dx);
+  for(let i=0; i<list.length; i++){
+    const b = list[i];
+    if(b.id === ignoreId) continue;
+    if(span1(x, x+dx, b.x, b.x+b.dx) && span1(y, y+dy, b.y, b.y+b.dy) && span1(z, z+dz, b.z, b.z+b.dz)) return true;
+  }
+  return false;
+}
+
+// How much of the box bottom rests on the floor or on the top faces of boxes that are
+// allowed to be loaded on. Boxes marked "нельзя ставить на него" never count as support.
+function supportRatio(space, x, y, z, dx, dz, ignoreId){
+  if(y <= PACK_EPS) return 1;
+  const area = dx * dz;
+  if(area <= 0) return 0;
+  let covered = 0;
+  const list = space.near(x, x + dx);
+  for(let i=0; i<list.length; i++){
+    const b = list[i];
+    if(b.id === ignoreId) continue;
+    if(b.noSupport) continue;
+    if(Math.abs(b.y + b.dy - y) > 0.5) continue;
+    const ox = Math.min(x+dx, b.x+b.dx) - Math.max(x, b.x);
+    const oz = Math.min(z+dz, b.z+b.dz) - Math.max(z, b.z);
+    if(ox > 0 && oz > 0) covered += ox * oz;
+  }
+  return covered / area;
+}
+
+// Lowest height the box can rest at for this footprint: the highest top face underneath it.
+function dropY(space, x, z, dx, dz, ignoreId){
+  let y = 0;
+  const list = space.near(x, x + dx);
+  for(let i=0; i<list.length; i++){
+    const b = list[i];
+    if(b.id === ignoreId) continue;
+    const ox = Math.min(x+dx, b.x+b.dx) - Math.max(x, b.x);
+    const oz = Math.min(z+dz, b.z+b.dz) - Math.max(z, b.z);
+    if(ox > PACK_EPS && oz > PACK_EPS) y = Math.max(y, b.y + b.dy);
+  }
+  return y;
+}
+
+function packFeasible(space, x, y, z, dx, dy, dz, item, ignoreId){
+  if(x < -PACK_EPS || y < -PACK_EPS || z < -PACK_EPS) return false;
+  if(x + dx > space.L + PACK_EPS || y + dy > space.H + PACK_EPS || z + dz > space.W + PACK_EPS) return false;
+  if(item && item.noGoOnTop && y > PACK_EPS) return false;
+  if(packCollides(space, x, y, z, dx, dy, dz, ignoreId)) return false;
+  return supportRatio(space, x, y, z, dx, dz, ignoreId) >= SUPPORT_RATIO - PACK_EPS;
+}
+
+// Picks where the next unit of `item` goes. Tries the three neighbours of the previously
+// placed identical box first — that alone resolves most of a long homogeneous row or stack
+// without scanning the whole candidate list, which keeps big orders fast.
+function findSpot(space, points, oris, item, last){
+  if(last){
+    const quick = [
+      { x: last.x, y: last.y, z: last.z + last.dz },
+      { x: last.x + last.dx, y: last.y, z: last.z },
+      { x: last.x, y: last.y + last.dy, z: last.z },
+    ];
+    for(let i=0; i<quick.length; i++){
+      const c = quick[i];
+      if(packFeasible(space, c.x, c.y, c.z, last.dx, last.dy, last.dz, item)){
+        return { x:c.x, y:c.y, z:c.z, dx:last.dx, dy:last.dy, dz:last.dz };
+      }
+    }
+  }
+  // Otherwise weigh every candidate corner and keep the best one: lowest first, then the
+  // one that pushes the load's tail the least, then closest to the near side. Taking the
+  // first workable corner instead would let a single box wander off down the body and
+  // waste the width behind it.
+  let best = null, bestKey = null;
+  for(let i=0; i<points.length; i++){
+    const p = points[i];
+    for(let k=0; k<oris.length; k++){
+      const o = oris[k];
+      if(!packFeasible(space, p.x, p.y, p.z, o.dx, o.dy, o.dz, item)) continue;
+      const key = [p.y, p.x + o.dx, p.z, p.x];
+      if(!bestKey || key[0] < bestKey[0]
+        || (key[0] === bestKey[0] && (key[1] < bestKey[1]
+        || (key[1] === bestKey[1] && (key[2] < bestKey[2]
+        || (key[2] === bestKey[2] && key[3] < bestKey[3])))))){
+        bestKey = key;
+        best = { x:p.x, y:p.y, z:p.z, dx:o.dx, dy:o.dy, dz:o.dz };
+      }
+    }
+  }
   return best;
 }
 
-function packVehicle(vehicle, items){
-  // items: [{name,l,w,h,qty,weight}]
-  const sorted = [...items].sort((a,b)=> (b.l*b.w*b.h) - (a.l*a.w*a.h));
-  let availableLength = vehicle.l;
-  const placements = [];
-  sorted.forEach(item=>{
-    const upright = item.upright !== false;
-    const ori = bestOrientation(item.l, item.w, item.h, vehicle.w, vehicle.h, availableLength, upright);
-    if(!ori || ori.count===0){
-      // Doesn't fit at all — check whether a 10x (or 100x) unit slip would explain it,
-      // so the user can spot a data-entry mistake instead of assuming the calculator is wrong.
-      let unitWarning = null;
-      for(const factor of [0.1, 0.01]){
-        const scaledOri = bestOrientation(item.l*factor, item.w*factor, item.h*factor, vehicle.w, vehicle.h, vehicle.l, upright);
-        if(scaledOri && scaledOri.count>0){ unitWarning = factor===0.1 ? '×10' : '×100'; break; }
-      }
-      placements.push({ item, placed:0, ori:null, segmentLength:0, unitWarning });
-      return;
+// Slides a corner back toward the near wall / front wall until it meets whatever is already
+// standing there. Without this a single box that sits slightly off-line — a pallet wider than
+// the boxes beside it, say — walls off the strip behind it for the rest of the load.
+function projectZ(space, x, y, z){
+  let best = 0;
+  const list = space.near(x, x + 1);
+  for(let i=0; i<list.length; i++){
+    const b = list[i];
+    if(b.x > x + PACK_EPS || b.x + b.dx < x + PACK_EPS) continue;
+    if(b.y > y + PACK_EPS || b.y + b.dy < y + PACK_EPS) continue;
+    if(b.z + b.dz <= z + PACK_EPS) best = Math.max(best, b.z + b.dz);
+  }
+  return best;
+}
+function projectX(space, x, y, z){
+  let best = 0;
+  const list = space.near(0, x);
+  for(let i=0; i<list.length; i++){
+    const b = list[i];
+    if(b.z > z + PACK_EPS || b.z + b.dz < z + PACK_EPS) continue;
+    if(b.y > y + PACK_EPS || b.y + b.dy < y + PACK_EPS) continue;
+    if(b.x + b.dx <= x + PACK_EPS) best = Math.max(best, b.x + b.dx);
+  }
+  return best;
+}
+
+// Registers a candidate corner once — duplicates would only slow the search down.
+function addPoint(points, seen, x, y, z){
+  const key = Math.round(x)+'|'+Math.round(y)+'|'+Math.round(z);
+  if(seen[key]) return;
+  seen[key] = 1;
+  points.push({ x, y, z });
+}
+
+// Drops candidate corners that now sit inside the box just placed — they can never host
+// another box, and keeping them would slow every later search down.
+function prunePoints(points, box){
+  return points.filter(p=>
+    !(p.x >= box.x - PACK_EPS && p.x < box.x + box.dx - PACK_EPS &&
+      p.y >= box.y - PACK_EPS && p.y < box.y + box.dy - PACK_EPS &&
+      p.z >= box.z - PACK_EPS && p.z < box.z + box.dz - PACK_EPS)
+  );
+}
+
+/* ---- free space bookkeeping ----
+   The body is tracked as a list of maximal empty cuboids. Loading a block carves it out of
+   every space it touches; the leftovers become new spaces. Working with whole blocks instead
+   of single boxes is what keeps mixed loads tidy: a pallet no longer walls off the strip
+   behind it, because the strip stays in the list as a space of its own.                    */
+function freeContains(g, f){
+  return g.x <= f.x + PACK_EPS && g.y <= f.y + PACK_EPS && g.z <= f.z + PACK_EPS &&
+         g.x + g.dx >= f.x + f.dx - PACK_EPS &&
+         g.y + g.dy >= f.y + f.dy - PACK_EPS &&
+         g.z + g.dz >= f.z + f.dz - PACK_EPS;
+}
+
+const MAX_FREE_SPACES = 600; // keeps the list bounded on very fragmented loads
+
+function pruneFree(list){
+  const kept = list.filter(f=> f.dx > PACK_EPS && f.dy > PACK_EPS && f.dz > PACK_EPS);
+  const out = [];
+  for(let i=0; i<kept.length; i++){
+    let covered = false;
+    for(let j=0; j<kept.length && !covered; j++){
+      if(i === j) continue;
+      if(!freeContains(kept[j], kept[i])) continue;
+      // identical spaces contain each other — keep only the first of them
+      covered = !freeContains(kept[i], kept[j]) || j < i;
     }
-    const capacityPerLayer = ori.nx*ori.ny;
-    const neededLayers = Math.ceil(item.qty/capacityPerLayer);
-    const layersUsed = Math.min(ori.layers, neededLayers);
-    const placed = Math.min(item.qty, layersUsed*capacityPerLayer);
-    const segmentLength = layersUsed*ori.depth;
-    availableLength -= segmentLength;
-    placements.push({ item, placed, ori, layersUsed, segmentLength, footprintW: ori.nx*ori.fw, footprintH: ori.ny*ori.fh });
+    if(!covered) out.push(kept[i]);
+  }
+  if(out.length > MAX_FREE_SPACES){
+    out.sort((a, b)=> (b.dx*b.dy*b.dz) - (a.dx*a.dy*a.dz));
+    return out.slice(0, MAX_FREE_SPACES);
+  }
+  return out;
+}
+
+function splitFree(free, b){
+  const out = [];
+  free.forEach(f=>{
+    const hits = span1(f.x, f.x+f.dx, b.x, b.x+b.dx) &&
+                 span1(f.y, f.y+f.dy, b.y, b.y+b.dy) &&
+                 span1(f.z, f.z+f.dz, b.z, b.z+b.dz);
+    if(!hits){ out.push(f); return; }
+    if(b.x > f.x + PACK_EPS)                 out.push({ x:f.x, y:f.y, z:f.z, dx:b.x-f.x, dy:f.dy, dz:f.dz });
+    if(b.x+b.dx < f.x+f.dx - PACK_EPS)       out.push({ x:b.x+b.dx, y:f.y, z:f.z, dx:f.x+f.dx-b.x-b.dx, dy:f.dy, dz:f.dz });
+    if(b.y > f.y + PACK_EPS)                 out.push({ x:f.x, y:f.y, z:f.z, dx:f.dx, dy:b.y-f.y, dz:f.dz });
+    if(b.y+b.dy < f.y+f.dy - PACK_EPS)       out.push({ x:f.x, y:b.y+b.dy, z:f.z, dx:f.dx, dy:f.y+f.dy-b.y-b.dy, dz:f.dz });
+    if(b.z > f.z + PACK_EPS)                 out.push({ x:f.x, y:f.y, z:f.z, dx:f.dx, dy:f.dy, dz:b.z-f.z });
+    if(b.z+b.dz < f.z+f.dz - PACK_EPS)       out.push({ x:f.x, y:f.y, z:b.z+b.dz, dx:f.dx, dy:f.dy, dz:f.z+f.dz-b.z-b.dz });
   });
-  const totalRequested = items.reduce((s,i)=>s+i.qty,0);
-  const totalPlaced = placements.reduce((s,p)=>s+p.placed,0);
-  const totalVolume = vehicle.l*vehicle.w*vehicle.h;
-  const usedVolume = placements.reduce((s,p)=> s + p.placed*p.item.l*p.item.w*p.item.h, 0);
-  const totalWeight = placements.reduce((s,p)=> s + p.placed*(p.item.weight||0), 0);
-  return {
-    vehicle, placements, totalRequested, totalPlaced,
-    leftoverLength: Math.max(0,availableLength),
-    utilization: totalVolume ? (usedVolume/totalVolume*100) : 0,
-    totalWeight,
-    fitsAll: totalPlaced>=totalRequested,
-  };
+  return pruneFree(out);
+}
+
+// The biggest grid of one product that fits into one empty space. Preference goes to the
+// lowest space, then to whichever choice loads the most units, then to the space nearest the
+// front — so the floor is used up before anything is stacked.
+function bestBlock(free, item, left){
+  const oris = orientationsFor(item);
+  let best = null;
+  for(let i=0; i<free.length; i++){
+    const f = free[i];
+    if(item.noGoOnTop && f.y > PACK_EPS) continue;
+    for(let k=0; k<oris.length; k++){
+      const o = oris[k];
+      const nx = Math.floor((f.dx + PACK_EPS) / o.dx);
+      const ny = Math.floor((f.dy + PACK_EPS) / o.dy);
+      const nz = Math.floor((f.dz + PACK_EPS) / o.dz);
+      if(nx < 1 || ny < 1 || nz < 1) continue;
+      const cnt = Math.min(left, nx*ny*nz);
+      // where the block's tail lands, given it is filled bottom layer first, slice by slice —
+      // among equally good choices the one that eats the least length wins
+      const tail = f.x + Math.ceil(Math.min(cnt, nx*nz) / nz) * o.dx;
+      const key = [f.y, -cnt, tail, f.z];
+      if(!best || key[0] < best.key[0]
+        || (key[0] === best.key[0] && (key[1] < best.key[1]
+        || (key[1] === best.key[1] && (key[2] < best.key[2]
+        || (key[2] === best.key[2] && key[3] < best.key[3])))))){
+        best = { f, o, nx, ny, nz, cnt, key };
+      }
+    }
+  }
+  return best;
+}
+
+// Merges a row of boxes that ended up side by side into one cuboid, so carving the block out
+// of the free-space list costs a handful of splits instead of one per box.
+function mergeRuns(boxes){
+  const rows = new Map();
+  boxes.forEach(b=>{
+    const key = b.y+'|'+b.x+'|'+b.dy+'|'+b.dx;
+    (rows.get(key) || rows.set(key, []).get(key)).push(b);
+  });
+  const out = [];
+  rows.forEach(list=>{
+    list.sort((a,b)=> a.z - b.z);
+    let run = null;
+    list.forEach(b=>{
+      if(run && Math.abs(run.z + run.dz - b.z) < PACK_EPS){ run.dz += b.dz; return; }
+      run = { x:b.x, y:b.y, z:b.z, dx:b.dx, dy:b.dy, dz:b.dz };
+      out.push(run);
+    });
+  });
+  return out;
+}
+
+// Two strategies are tried: solid blocks first (tidy, and much stronger on mixed loads),
+// then plain box-by-box if the blocks left something behind — box-by-box occasionally
+// squeezes a few more units into an awkward body. Whichever loads more wins.
+function packVehicle(vehicle, items){
+  const t0 = packNow();
+  const byBlocks = packRun(vehicle, items, true, t0, PACK_TIME_BUDGET_MS);
+  if(byBlocks.fitsAll) return byBlocks;
+  const oneByOne = packRun(vehicle, items, false, packNow(), PACK_RETRY_BUDGET_MS);
+  return oneByOne.totalPlaced > byBlocks.totalPlaced ? oneByOne : byBlocks;
+}
+
+function packRun(vehicle, items, useBlocks, t0, budgetMs){
+  const space = makeSpace(vehicle);
+  let timedOut = false;
+  let boxSeq = 0;
+  let free = [{ x:0, y:0, z:0, dx:vehicle.l, dy:vehicle.h, dz:vehicle.w }];
+  const placements = [];
+  const leftById = new Map();
+
+  // Things that must stay on the floor (pallets, heavy) go in first, then biggest volume first.
+  const order = items.map((it, i)=> ({ it, i })).sort((a, b)=>{
+    const fa = a.it.noGoOnTop ? 0 : 1, fb = b.it.noGoOnTop ? 0 : 1;
+    if(fa !== fb) return fa - fb;
+    return (b.it.l*b.it.w*b.it.h) - (a.it.l*a.it.w*a.it.h);
+  });
+
+  function makeBox(item, itemIndex, x, y, z, o){
+    return {
+      id: ++boxSeq, item, itemIndex,
+      x, y, z, dx:o.dx, dy:o.dy, dz:o.dz,
+      noSupport: item.noSupport === true,
+    };
+  }
+
+  /* ---- pass 1: load each product as solid blocks ---- */
+  const boxesByItem = new Map();
+  order.forEach(({ it, i })=>{
+    boxesByItem.set(it, []);
+    let left = it.qty;
+    while(useBlocks && left > 0){
+      if(packNow() - t0 > budgetMs){ timedOut = true; break; }
+      const choice = bestBlock(free, it, left);
+      if(!choice) break;
+      const { f, o, nx, ny, nz } = choice;
+      const added = [];
+      outer:
+      for(let iy=0; iy<ny; iy++){
+        for(let ix=0; ix<nx; ix++){
+          for(let iz=0; iz<nz; iz++){
+            if(added.length >= choice.cnt) break outer;
+            const x = f.x + ix*o.dx, y = f.y + iy*o.dy, z = f.z + iz*o.dz;
+            if(!packFeasible(space, x, y, z, o.dx, o.dy, o.dz, it)) continue;
+            const box = makeBox(it, i, x, y, z, o);
+            space.add(box);
+            added.push(box);
+          }
+        }
+      }
+      if(!added.length){
+        // nothing could actually stand there (no support, most likely) — retire the space
+        free = free.filter(s=> s !== f);
+        continue;
+      }
+      mergeRuns(added).forEach(cub=>{ free = splitFree(free, cub); });
+      boxesByItem.get(it).push(...added);
+      left -= added.length;
+    }
+    leftById.set(it, left);
+  });
+
+  /* ---- pass 2: top up the odd pockets the blocks left behind, box by box ---- */
+  const points = [];
+  const pointSeen = {};
+  free.forEach(f=> addPoint(points, pointSeen, f.x, f.y, f.z));
+  space.boxes.slice().forEach(b=>{
+    addPoint(points, pointSeen, b.x + b.dx, b.y, b.z);
+    addPoint(points, pointSeen, b.x, b.y, b.z + b.dz);
+    if(!b.noSupport) addPoint(points, pointSeen, b.x, b.y + b.dy, b.z);
+  });
+
+  order.forEach(({ it, i })=>{
+    let left = leftById.get(it) || 0;
+    const oris = orientationsFor(it);
+    let last = null;
+    while(left > 0){
+      if(packNow() - t0 > budgetMs){ timedOut = true; break; }
+      const spot = findSpot(space, points, oris, it, last);
+      if(!spot) break;
+      const box = makeBox(it, i, spot.x, spot.y, spot.z, spot);
+      space.add(box);
+      boxesByItem.get(it).push(box);
+      last = box;
+      addPoint(points, pointSeen, box.x + box.dx, box.y, box.z);
+      addPoint(points, pointSeen, box.x, box.y, box.z + box.dz);
+      if(!box.noSupport) addPoint(points, pointSeen, box.x, box.y + box.dy, box.z);
+      addPoint(points, pointSeen, box.x + box.dx, box.y, projectZ(space, box.x + box.dx, box.y, box.z));
+      addPoint(points, pointSeen, projectX(space, box.x, box.y, box.z + box.dz), box.y, box.z + box.dz);
+      left--;
+    }
+    leftById.set(it, left);
+  });
+
+  /* ---- results ---- */
+  order.forEach(({ it, i })=>{
+    const boxes = boxesByItem.get(it) || [];
+    let unitWarning = null;
+    if(!boxes.length){
+      // Nothing loaded. If it wouldn't even fit into an empty body, the numbers themselves
+      // are suspect — check whether a 10x/100x unit slip would explain it, like before.
+      const oris = orientationsFor(it);
+      const fitsEmpty = oris.some(o=> o.dx <= vehicle.l + PACK_EPS && o.dy <= vehicle.h + PACK_EPS && o.dz <= vehicle.w + PACK_EPS);
+      if(!fitsEmpty){
+        for(const factor of [0.1, 0.01]){
+          const scaled = { l: it.l*factor, w: it.w*factor, h: it.h*factor, upright: it.upright };
+          const ok = orientationsFor(scaled).some(o=> o.dx <= vehicle.l && o.dy <= vehicle.h && o.dz <= vehicle.w);
+          if(ok){ unitWarning = factor === 0.1 ? '×10' : '×100'; break; }
+        }
+      }
+    }
+    placements.push({ item: it, itemIndex: i, placed: boxes.length, requested: it.qty, boxes, unitWarning });
+  });
+
+  placements.sort((a, b)=> a.itemIndex - b.itemIndex);
+
+  const result = { vehicle, placements, boxes: space.boxes, space, timedOut, unitCount: 1 };
+  syncUnitStats(result);
+  return result;
+}
+
+// Recomputes everything shown on screen straight from the box list. Called after packing and
+// after every manual move, so the table, totals and free space always match the drawing.
+function syncUnitStats(result){
+  const v = result.vehicle;
+  const space = makeSpace(v);
+  result.boxes.forEach(b=> space.add(b));
+  result.space = space;
+
+  result.placements.forEach(p=>{
+    p.boxes = result.boxes.filter(b=> b.item === p.item);
+    p.placed = p.boxes.length;
+    if(p.boxes.length){
+      const counts = {};
+      p.boxes.forEach(b=>{ const k = b.dx+'|'+b.dy+'|'+b.dz; counts[k] = (counts[k]||0) + 1; });
+      const keys = Object.keys(counts).sort((a, b)=> counts[b] - counts[a]);
+      const dom = keys[0].split('|').map(Number);
+      p.ori = { depth: dom[0], fh: dom[1], fw: dom[2] };
+      p.oriMixed = keys.length > 1;
+      p.maxTop = p.boxes.reduce((m, b)=> Math.max(m, b.y + b.dy), 0);
+    } else {
+      p.ori = null; p.oriMixed = false; p.maxTop = 0;
+    }
+  });
+
+  const usedLength = result.boxes.reduce((m, b)=> Math.max(m, b.x + b.dx), 0);
+  const totalVolume = v.l * v.w * v.h;
+  const usedVolume = result.boxes.reduce((s, b)=> s + b.dx*b.dy*b.dz, 0);
+  result.leftoverLength = Math.max(0, v.l - usedLength);
+  result.totalPlaced = result.boxes.length;
+  result.totalRequested = result.placements.reduce((s, p)=> s + p.requested, 0);
+  result.utilization = totalVolume ? (usedVolume / totalVolume * 100) : 0;
+  result.totalWeight = result.boxes.reduce((s, b)=> s + (b.item.weight || 0), 0);
+  result.fitsAll = result.totalPlaced >= result.totalRequested;
+  return result;
+}
+
+// Which already-placed boxes a given box is resting on ('пол' when it is on the floor).
+function supportersOf(space, box){
+  if(box.y <= PACK_EPS) return [];
+  return space.near(box.x, box.x + box.dx).filter(b=>{
+    if(b.id === box.id) return false;
+    if(Math.abs(b.y + b.dy - box.y) > 0.5) return false;
+    const ox = Math.min(box.x+box.dx, b.x+b.dx) - Math.max(box.x, b.x);
+    const oz = Math.min(box.z+box.dz, b.z+b.dz) - Math.max(box.z, b.z);
+    return ox > PACK_EPS && oz > PACK_EPS;
+  });
 }
 
 // Plans a whole fleet of N identical units of one vehicle type: fills unit 1 to capacity
@@ -810,33 +1245,50 @@ function packFleet(vehicle, unitCount, items){
     result.placements.forEach(p=>{ p.item.qty -= p.placed; });
     units.push(result);
   }
-  const totalRequested = items.reduce((s,i)=>s+i.qty,0);
-  const totalPlaced = units.reduce((s,u)=>s+u.totalPlaced,0);
-  const totalWeight = units.reduce((s,u)=>s+u.totalWeight,0);
-  const avgUtilization = units.length ? units.reduce((s,u)=>s+u.utilization,0)/units.length : 0;
-  return {
-    vehicle, unitCount, units,
-    unitsUsed: units.length,
-    totalRequested, totalPlaced, totalWeight,
-    avgUtilization,
-    fitsAll: totalPlaced>=totalRequested,
-  };
+  const fleet = { vehicle, unitCount, units };
+  syncFleetStats(fleet, items);
+  return fleet;
 }
 
-/* ========================= SVG VISUALIZATION ========================= */
-function renderVehicleSVG(result){
-  const { vehicle, placements, leftoverLength } = result;
+function syncFleetStats(fleet, items){
+  fleet.unitsUsed = fleet.units.length;
+  fleet.totalRequested = items.reduce((s,i)=>s+i.qty,0);
+  fleet.totalPlaced = fleet.units.reduce((s,u)=>s+u.totalPlaced,0);
+  fleet.totalWeight = fleet.units.reduce((s,u)=>s+u.totalWeight,0);
+  fleet.avgUtilization = fleet.units.length ? fleet.units.reduce((s,u)=>s+u.utilization,0)/fleet.units.length : 0;
+  fleet.timedOut = fleet.units.some(u=>u.timedOut);
+  fleet.fitsAll = fleet.totalPlaced >= fleet.totalRequested;
+  return fleet;
+}
+
+/* ========================= SVG VISUALIZATION =========================
+   Draws every loaded box as its own cuboid at its real position. Boxes are painted
+   far-to-near so the ones in front cover the ones behind them.                        */
+const VIEW_W = 1280;
+const VIEW_H_MIN = 440, VIEW_H_MAX = 880; // the canvas grows with the body so it isn't mostly blank
+const SIN_A = 0.5, COS_A = 0.866;
+const MAX_BOXES_DRAWN = 1500; // guard so a huge order can't produce an unusable SVG
+const VIZ = {};               // svgId -> projection + unit, needed for click and drag
+
+let vizSelection = null;      // { svgId, boxId }
+
+function renderVehicleSVG(result, svgId){
+  const { vehicle, leftoverLength } = result;
+  const boxes = result.boxes || [];
   const L = vehicle.l, W = vehicle.w, H = vehicle.h;
-  const viewW = 920, viewH = 380;
-  const marginL = 80, marginT = 40, marginB = 60, marginR = 40;
+  const viewW = VIEW_W;
+  const marginL = 90, marginT = 46, marginB = 66, marginR = 46;
   const drawW = viewW - marginL - marginR;
-  const drawH = viewH - marginT - marginB;
-  const sinA = 0.5, cosA = 0.866;
+  const sinA = SIN_A, cosA = COS_A;
   // True isometric: x (length), y (height) and z (width) all share one scale `s`.
-  // Solve for the largest `s` that keeps the whole box within the drawing area.
+  // A long body drawn isometrically is tall as well as wide, so instead of squeezing it into
+  // a fixed canvas we let the canvas follow the shape — the drawing then fills the width.
   const neededWidthUnits = (L + W) * cosA;
   const neededHeightUnits = (L + W) * sinA + H;
-  const s = Math.min(drawW / neededWidthUnits, drawH / neededHeightUnits);
+  const sByWidth = drawW / neededWidthUnits;
+  const viewH = Math.max(VIEW_H_MIN, Math.min(VIEW_H_MAX, Math.round(neededHeightUnits * sByWidth) + marginT + marginB));
+  const drawH = viewH - marginT - marginB;
+  const s = Math.min(sByWidth, drawH / neededHeightUnits);
 
   function rawProj(x,y,z){
     return [ (x - z) * cosA * s, (x + z) * sinA * s - y * s ];
@@ -856,7 +1308,9 @@ function renderVehicleSVG(result){
     return [ rx + offsetX, ry + offsetY ];
   }
 
-  let svg = `<svg viewBox="0 0 ${viewW} ${viewH}" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Mono, monospace">`;
+  if(svgId) VIZ[svgId] = { result, s, sinA, cosA, offsetX, offsetY, L, W, H };
+
+  let svg = `<svg viewBox="0 0 ${viewW} ${viewH}" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Mono, monospace"${svgId?` data-viz="${svgId}"`:''}>`;
 
   // container wireframe
   const corners = {
@@ -868,7 +1322,6 @@ function renderVehicleSVG(result){
     svg += `<line x1="${corners[p1][0].toFixed(1)}" y1="${corners[p1][1].toFixed(1)}" x2="${corners[p2][0].toFixed(1)}" y2="${corners[p2][1].toFixed(1)}" stroke="#b7bfb3" stroke-width="1"/>`;
   });
 
-  // leftover floor (yellow) - drawn first so cargo overlaps visually correct order along length handled by draw order below
   function floorQuad(x0,x1,z0,z1,fill){
     const p1=projFull(x0,0,z0), p2=projFull(x1,0,z0), p3=projFull(x1,0,z1), p4=projFull(x0,0,z1);
     return `<polygon points="${p1.map(v=>v.toFixed(1)).join(',')} ${p2.map(v=>v.toFixed(1)).join(',')} ${p3.map(v=>v.toFixed(1)).join(',')} ${p4.map(v=>v.toFixed(1)).join(',')}" fill="${fill}" stroke="#cfae52" stroke-width="0.5"/>`;
@@ -879,96 +1332,272 @@ function renderVehicleSVG(result){
     svg += floorQuad(coveredLength, L, 0, W, '#eee2ab');
   }
 
-  // cargo cuboid with optional grid lines (nx columns across width, ny rows across height)
-  function cuboid(x0,x1,y0,y1,z0,z1,colors,nx,ny){
+  // one cargo box
+  function cuboid(x0,x1,y0,y1,z0,z1,colors){
     const A_=projFull(x0,y1,z0), B_=projFull(x1,y1,z0), C_=projFull(x1,y1,z1), D_=projFull(x0,y1,z1);
     const E_=projFull(x0,y0,z0), F_=projFull(x1,y0,z0), G_=projFull(x1,y0,z1);
     const pts = p=>p.map(v=>v.toFixed(1)).join(',');
-    let s = '';
-    s += `<polygon points="${pts(B_)} ${pts(C_)} ${pts(G_)} ${pts(F_)}" fill="${colors.side}" stroke="#16232a" stroke-width="0.6"/>`;
-    s += `<polygon points="${pts(A_)} ${pts(B_)} ${pts(F_)} ${pts(E_)}" fill="${colors.front}" stroke="#16232a" stroke-width="0.6"/>`;
-    s += `<polygon points="${pts(A_)} ${pts(B_)} ${pts(C_)} ${pts(D_)}" fill="${colors.top}" stroke="#16232a" stroke-width="0.6"/>`;
-    // grid lines on front face (height divisions)
-    if(ny>1){
-      for(let k=1;k<ny && k<20;k++){
-        const y = y0 + (y1-y0)*k/ny;
-        const p1=projFull(x0,y,z0), p2=projFull(x1,y,z0);
-        s += `<line x1="${p1[0].toFixed(1)}" y1="${p1[1].toFixed(1)}" x2="${p2[0].toFixed(1)}" y2="${p2[1].toFixed(1)}" stroke="#16232a" stroke-opacity="0.35" stroke-width="0.6"/>`;
-        const p3=projFull(x1,y,z1);
-        s += `<line x1="${p2[0].toFixed(1)}" y1="${p2[1].toFixed(1)}" x2="${p3[0].toFixed(1)}" y2="${p3[1].toFixed(1)}" stroke="#16232a" stroke-opacity="0.3" stroke-width="0.6"/>`;
-      }
-    }
-    // grid lines on top face (width divisions)
-    if(nx>1){
-      for(let k=1;k<nx && k<20;k++){
-        const z = z0 + (z1-z0)*k/nx;
-        const p1=projFull(x0,y1,z), p2=projFull(x1,y1,z);
-        s += `<line x1="${p1[0].toFixed(1)}" y1="${p1[1].toFixed(1)}" x2="${p2[0].toFixed(1)}" y2="${p2[1].toFixed(1)}" stroke="#16232a" stroke-opacity="0.3" stroke-width="0.6"/>`;
-      }
-    }
-    return s;
+    let out = '';
+    out += `<polygon points="${pts(B_)} ${pts(C_)} ${pts(G_)} ${pts(F_)}" fill="${colors.side}" stroke="#16232a" stroke-width="0.6"/>`;
+    out += `<polygon points="${pts(A_)} ${pts(B_)} ${pts(F_)} ${pts(E_)}" fill="${colors.front}" stroke="#16232a" stroke-width="0.6"/>`;
+    out += `<polygon points="${pts(A_)} ${pts(B_)} ${pts(C_)} ${pts(D_)}" fill="${colors.top}" stroke="#16232a" stroke-width="0.6"/>`;
+    return out;
   }
 
-  // ghost outline for the empty leftover volume
+  // ghost outline for the empty leftover volume at the tail of the body
   function ghostBox(x0,x1){
     if(x1-x0 < 0.5) return '';
     const cA=projFull(x0,H,0), cB=projFull(x1,H,0), cC=projFull(x1,H,W), cD=projFull(x0,H,W);
     const cE=projFull(x0,0,0), cF=projFull(x1,0,0), cG=projFull(x1,0,W), cHh=projFull(x0,0,W);
     const pts = p=>p.map(v=>v.toFixed(1)).join(',');
-    let s = `<polygon points="${pts(cA)} ${pts(cB)} ${pts(cC)} ${pts(cD)}" fill="#f4e6ab" fill-opacity="0.45" stroke="none"/>`;
+    let out = `<polygon points="${pts(cA)} ${pts(cB)} ${pts(cC)} ${pts(cD)}" fill="#f4e6ab" fill-opacity="0.3" stroke="none"/>`;
     const edges = [[cA,cB],[cB,cC],[cC,cD],[cD,cA],[cE,cF],[cF,cG],[cG,cHh],[cHh,cE],[cA,cE],[cB,cF],[cC,cG],[cD,cHh]];
     edges.forEach(([p1,p2])=>{
-      s += `<line x1="${p1[0].toFixed(1)}" y1="${p1[1].toFixed(1)}" x2="${p2[0].toFixed(1)}" y2="${p2[1].toFixed(1)}" stroke="#b98a1f" stroke-width="1" stroke-dasharray="4 3"/>`;
+      out += `<line x1="${p1[0].toFixed(1)}" y1="${p1[1].toFixed(1)}" x2="${p2[0].toFixed(1)}" y2="${p2[1].toFixed(1)}" stroke="#b98a1f" stroke-width="1" stroke-dasharray="4 3"/>`;
     });
-    const mid = projFull((x0+x1)/2, H*0.42, W/2);
-    s += `<text x="${mid[0].toFixed(1)}" y="${mid[1].toFixed(1)}" font-size="12" fill="#8a651a" text-anchor="middle" font-weight="600">своб. ${Math.round(x1-x0)} см</text>`;
-    return s;
+    const mid = projFull((x0+x1)/2, H*0.66, W/2);
+    out += `<text x="${mid[0].toFixed(1)}" y="${mid[1].toFixed(1)}" font-size="13" fill="#8a651a" text-anchor="middle" font-weight="600">своб. ${Math.round(x1-x0)} см</text>`;
+    return out;
   }
-
-  const UNFIT_COLORS = { top:'#f0a898', front:'#dd6a52', side:'#b84a35' };
-
-  let cursor = 0;
-  const MAX_LAYERS_DRAWN = 40; // cap per item so very high box counts stay readable
-  placements.forEach((p, idx)=>{
-    if(!p.ori || p.placed===0) { cursor += p.segmentLength||0; return; }
-    const fw = p.footprintW, fh = p.footprintH, depth = p.ori.depth;
-    const colors = p.item._colorIdx === 'unfit' ? UNFIT_COLORS : PALETTE[(p.item._colorIdx ?? idx) % PALETTE.length];
-    const layersToDraw = Math.min(p.layersUsed, MAX_LAYERS_DRAWN);
-    for(let l=0; l<layersToDraw; l++){
-      const x0 = cursor + l*depth, x1 = x0 + depth;
-      svg += cuboid(x0, x1, 0, fh, 0, fw, colors, p.ori.nx, p.ori.ny);
-    }
-    if(p.layersUsed > MAX_LAYERS_DRAWN){
-      // schematic block representing the remaining layers, not drawn box-by-box
-      const restX0 = cursor + layersToDraw*depth;
-      const restX1 = cursor + p.segmentLength;
-      svg += cuboid(restX0, restX1, 0, fh, 0, fw, colors, 0, 0);
-    }
-    cursor += p.segmentLength;
-  });
 
   svg += ghostBox(coveredLength, L);
 
+  const UNFIT_COLORS = { top:'#f0a898', front:'#dd6a52', side:'#b84a35' };
 
-  // axis: length ticks along bottom-front edge (E->F)
+  // Painter's algorithm: the camera looks at the +x end, the z=0 side and the top, so a box
+  // is nearer when x and y are larger and z is smaller. Sorting by (x0 + y0 - z1) ascending
+  // therefore draws the far ones first.
+  const drawn = boxes.slice().sort((a,b)=> (a.x + a.y - (a.z+a.dz)) - (b.x + b.y - (b.z+b.dz)));
+  const overflow = Math.max(0, drawn.length - MAX_BOXES_DRAWN);
+  drawn.slice(0, MAX_BOXES_DRAWN).forEach(b=>{
+    const colors = b.item._colorIdx === 'unfit' ? UNFIT_COLORS : PALETTE[(b.item._colorIdx ?? 0) % PALETTE.length];
+    const selected = vizSelection && svgId && vizSelection.svgId === svgId && vizSelection.boxId === b.id;
+    svg += `<g class="viz-box${selected?' selected':''}"${svgId?` data-box="${b.id}"`:''}>${cuboid(b.x, b.x+b.dx, b.y, b.y+b.dy, b.z, b.z+b.dz, colors)}</g>`;
+  });
+
+  // axis: length ticks along the lowest edge (0,0,W)->(L,0,W), which runs outside the cargo —
+  // on the (x,0,0) edge the numbers ended up printed over the boxes
   const tickStep = niceStep(L);
   for(let x=0; x<=L+0.001; x+=tickStep){
-    const [px,py] = projFull(x,0,0);
+    const [px,py] = projFull(x,0,W);
     svg += `<line x1="${px.toFixed(1)}" y1="${py.toFixed(1)}" x2="${px.toFixed(1)}" y2="${(py+6).toFixed(1)}" stroke="#8a938a" stroke-width="1"/>`;
-    svg += `<text x="${px.toFixed(1)}" y="${(py+18).toFixed(1)}" font-size="10" fill="#5c655c" text-anchor="middle">${Math.round(x)}</text>`;
+    svg += `<text x="${px.toFixed(1)}" y="${(py+18).toFixed(1)}" font-size="11" fill="#5c655c" text-anchor="middle">${Math.round(x)}</text>`;
   }
-  svg += `<text x="${(marginL+drawW/2).toFixed(1)}" y="${(viewH-8).toFixed(1)}" font-size="11" fill="#8a938a" text-anchor="middle">длина, см</text>`;
+  svg += `<text x="${(marginL+drawW/2).toFixed(1)}" y="${(viewH-10).toFixed(1)}" font-size="12" fill="#8a938a" text-anchor="middle">длина, см</text>`;
 
-  // axis: height ticks along left edge (E->A)
+  // axis: height ticks along the far-left edge (0,*,W) — the leftmost edge on screen, so the
+  // numbers never land on top of the cargo the way they did on the (0,*,0) edge
   const tickStepH = niceStep(H);
   for(let y=0; y<=H+0.001; y+=tickStepH){
-    const [px,py] = projFull(0,y,0);
+    const [px,py] = projFull(0,y,W);
     svg += `<line x1="${(px-6).toFixed(1)}" y1="${py.toFixed(1)}" x2="${px.toFixed(1)}" y2="${py.toFixed(1)}" stroke="#8a938a" stroke-width="1"/>`;
-    svg += `<text x="${(px-10).toFixed(1)}" y="${(py+3).toFixed(1)}" font-size="10" fill="#5c655c" text-anchor="end">${Math.round(y)}</text>`;
+    svg += `<text x="${(px-10).toFixed(1)}" y="${(py+3).toFixed(1)}" font-size="11" fill="#5c655c" text-anchor="end">${Math.round(y)}</text>`;
+  }
+
+  if(overflow > 0){
+    svg += `<text x="${marginL}" y="${(marginT-16).toFixed(1)}" font-size="12" fill="#8a651a">на схеме показаны первые ${MAX_BOXES_DRAWN} коробок из ${drawn.length}</text>`;
   }
 
   svg += `</svg>`;
   return svg;
+}
+
+/* ========================= MANUAL RE-ARRANGING =========================
+   Click a box to select it, drag it across the floor to move it. A dragged box always
+   settles onto whatever is underneath, so dropping it over a pallet puts it on the pallet.
+   An impossible position (sticking out, overlapping, not enough support) turns red and is
+   rejected on release.                                                                    */
+
+let vizDrag = null;
+
+function vizFindBox(state, boxId){
+  return state.result.boxes.find(b=> b.id === boxId) || null;
+}
+
+// Screen delta -> movement across the floor. Inverting the isometric projection with the
+// height held fixed gives the two horizontal components directly.
+function screenToFloorDelta(state, dsx, dsy){
+  const a = dsx / (state.cosA * state.s);
+  const b = dsy / (state.sinA * state.s);
+  return { dx: (a + b) / 2, dz: (b - a) / 2 };
+}
+
+function vizProposePosition(state, box, dsx, dsy){
+  const d = screenToFloorDelta(state, dsx, dsy);
+  const x = Math.max(0, Math.min(state.L - box.dx, Math.round(box._ox + d.dx)));
+  const z = Math.max(0, Math.min(state.W - box.dz, Math.round(box._oz + d.dz)));
+  const y = dropY(state.result.space, x, z, box.dx, box.dz, box.id);
+  const ok = packFeasible(state.result.space, x, y, z, box.dx, box.dy, box.dz, box.item, box.id);
+  return { x, y, z, ok };
+}
+
+function vizTranslateFor(state, box, pos){
+  const dsx = ((pos.x - pos.z) - (box._ox - box._oz)) * state.cosA * state.s;
+  const dsy = ((pos.x + pos.z) - (box._ox + box._oz)) * state.sinA * state.s - (pos.y - box._oy) * state.s;
+  return `translate(${dsx.toFixed(1)},${dsy.toFixed(1)})`;
+}
+
+function wireVizHandlers(){
+  document.querySelectorAll('svg[data-viz]').forEach(svg=>{
+    const svgId = svg.dataset.viz;
+    const state = VIZ[svgId];
+    if(!state) return;
+
+    svg.querySelectorAll('g.viz-box').forEach(g=>{
+      g.addEventListener('mousedown', ev=>{
+        ev.preventDefault();
+        const box = vizFindBox(state, +g.dataset.box);
+        if(!box) return;
+        const rect = svg.getBoundingClientRect();
+        box._ox = box.x; box._oy = box.y; box._oz = box.z;
+        vizDrag = {
+          svgId, state, box, g, svg,
+          scale: rect.width ? VIEW_W / rect.width : 1,
+          startX: ev.clientX, startY: ev.clientY,
+          moved: false, pos: null,
+        };
+      });
+    });
+  });
+
+  document.querySelectorAll('[data-viz-act]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const act = btn.dataset.vizAct;
+      if(act === 'rotate') vizRotateSelected();
+      else if(act === 'floor') vizFloorSelected();
+      else if(act === 'remove') vizRemoveSelected();
+      else if(act === 'repack') vizRepackAll();
+    };
+  });
+}
+
+document.addEventListener('mousemove', ev=>{
+  if(!vizDrag) return;
+  const dsx = (ev.clientX - vizDrag.startX) * vizDrag.scale;
+  const dsy = (ev.clientY - vizDrag.startY) * vizDrag.scale;
+  if(!vizDrag.moved && Math.abs(dsx) < 4 && Math.abs(dsy) < 4) return;
+  vizDrag.moved = true;
+  const pos = vizProposePosition(vizDrag.state, vizDrag.box, dsx, dsy);
+  vizDrag.pos = pos;
+  vizDrag.g.setAttribute('transform', vizTranslateFor(vizDrag.state, vizDrag.box, pos));
+  vizDrag.g.classList.toggle('invalid', !pos.ok);
+  vizDrag.g.classList.add('dragging');
+});
+
+document.addEventListener('mouseup', ()=>{
+  if(!vizDrag) return;
+  const { box, pos, moved, svgId } = vizDrag;
+  const drag = vizDrag;
+  vizDrag = null;
+  if(!moved){
+    const same = vizSelection && vizSelection.svgId === svgId && vizSelection.boxId === box.id;
+    vizSelection = same ? null : { svgId, boxId: box.id };
+    setVizHint('');
+    rerenderResults();
+    return;
+  }
+  drag.g.classList.remove('dragging', 'invalid');
+  drag.g.removeAttribute('transform');
+  if(pos && pos.ok){
+    box.x = pos.x; box.y = pos.y; box.z = pos.z;
+    vizSelection = { svgId, boxId: box.id };
+    applyManualChange();
+  } else {
+    setVizHint('Сюда не встаёт: не хватает места или опоры под коробкой.');
+  }
+});
+
+let vizHint = '';
+function setVizHint(msg){
+  vizHint = msg;
+  document.querySelectorAll('.viz-tools-msg').forEach(el=> el.textContent = msg);
+}
+
+// After any manual move the whole picture is recomputed from the box list, so totals, the
+// table and the "не поместилось" panel can never drift away from what is drawn.
+function applyManualChange(){
+  const results = window.__lastResults || [];
+  results.forEach(r=>{
+    r.units.forEach(u=> syncUnitStats(u));
+    syncFleetStats(r, window.__lastItems || []);
+  });
+  manualEdited = true;
+  rerenderResults();
+}
+
+let manualEdited = false;
+
+function rerenderResults(){
+  const y = window.scrollY;
+  renderResults(window.__lastResults || [], window.__lastItems || []);
+  window.scrollTo(0, y);
+}
+
+/* ---- actions on the selected box ---- */
+function vizSelectedBox(){
+  if(!vizSelection) return null;
+  const state = VIZ[vizSelection.svgId];
+  if(!state) return null;
+  const box = vizFindBox(state, vizSelection.boxId);
+  return box ? { state, box } : null;
+}
+
+function vizRotateSelected(){
+  const sel = vizSelectedBox();
+  if(!sel) return;
+  const { state, box } = sel;
+  const oris = orientationsFor(box.item);
+  const cur = oris.findIndex(o=> o.dx===box.dx && o.dy===box.dy && o.dz===box.dz);
+  for(let k=1; k<=oris.length; k++){
+    const o = oris[(cur + k) % oris.length];
+    if(o.dx===box.dx && o.dy===box.dy && o.dz===box.dz) continue;
+    const x = Math.max(0, Math.min(state.L - o.dx, box.x));
+    const z = Math.max(0, Math.min(state.W - o.dz, box.z));
+    const y = dropY(state.result.space, x, z, o.dx, o.dz, box.id);
+    if(packFeasible(state.result.space, x, y, z, o.dx, o.dy, o.dz, box.item, box.id)){
+      box.dx=o.dx; box.dy=o.dy; box.dz=o.dz; box.x=x; box.y=y; box.z=z;
+      setVizHint('');
+      applyManualChange();
+      return;
+    }
+  }
+  setVizHint('Повернуть не получается — в этом месте другая ориентация не помещается.');
+}
+
+// Puts the box back on the floor at the first free spot, scanning front to back.
+function vizFloorSelected(){
+  const sel = vizSelectedBox();
+  if(!sel) return;
+  const { state, box } = sel;
+  const step = 10;
+  for(let x=0; x<=state.L-box.dx; x+=step){
+    for(let z=0; z<=state.W-box.dz; z+=step){
+      if(packFeasible(state.result.space, x, 0, z, box.dx, box.dy, box.dz, box.item, box.id)){
+        box.x=x; box.y=0; box.z=z;
+        setVizHint('');
+        applyManualChange();
+        return;
+      }
+    }
+  }
+  setVizHint('На полу нет свободного места под эту коробку.');
+}
+
+function vizRemoveSelected(){
+  const sel = vizSelectedBox();
+  if(!sel) return;
+  const { state, box } = sel;
+  state.result.boxes = state.result.boxes.filter(b=> b.id !== box.id);
+  vizSelection = null;
+  setVizHint('');
+  applyManualChange();
+}
+
+function vizRepackAll(){
+  vizSelection = null;
+  manualEdited = false;
+  setVizHint('');
+  recalcAndRender();
 }
 
 // Draws the vehicle's outline next to a filled cube whose volume equals the cargo that
@@ -984,16 +1613,13 @@ function renderUnfitVolumeSVG(vehicle, unfitVolM3){
     ? ` Показан не весь объём — он больше вместимости одного кузова этого типа (потребовалось бы ${(requiredLength/L).toFixed(1)}× по длине).`
     : '';
 
-  const fakeItem = { name:'не поместилось', l:drawnLength, w:W, h:H, _colorIdx:'unfit' };
-  const fakePlacement = {
-    item: fakeItem, placed: 1,
-    ori: { depth: drawnLength, fw: W, fh: H, nx:1, ny:1 },
-    layersUsed: 1, segmentLength: drawnLength,
-    footprintW: W, footprintH: H,
+  const fakeBox = {
+    id: 1, item: { name:'не поместилось', _colorIdx:'unfit' },
+    x:0, y:0, z:0, dx:drawnLength, dy:H, dz:W,
   };
-  const fakeUnit = { vehicle, placements:[fakePlacement], leftoverLength: Math.max(0, L-drawnLength) };
+  const fakeUnit = { vehicle, boxes:[fakeBox], placements:[], leftoverLength: Math.max(0, L-drawnLength) };
 
-  return { svg: renderVehicleSVG(fakeUnit), cappedNote };
+  return { svg: renderVehicleSVG(fakeUnit, null), cappedNote };
 }
 
 function niceStep(range){
@@ -1012,10 +1638,10 @@ function gatherItems(){
     if(r.mode==='catalog'){
       if(r.catalogIndex<0) return;
       const c = CATALOG[r.catalogIndex];
-      items.push({ name:c.name, l:c.l, w:c.w, h:c.h, qty:+r.qty||0, weight:c.weight||0, source:'catalog', catalogIndex:r.catalogIndex, upright:r.upright!==false });
+      items.push({ name:c.name, l:c.l, w:c.w, h:c.h, qty:+r.qty||0, weight:c.weight||0, source:'catalog', catalogIndex:r.catalogIndex, upright:r.upright!==false, noGoOnTop:r.noGoOnTop===true, noSupport:r.noSupport===true });
     } else {
       if(!r.l||!r.w||!r.h||!r.qty) return;
-      items.push({ name:r.name||'Коробка', l:+r.l, w:+r.w, h:+r.h, qty:+r.qty, weight:+r.weight||0, source:'manual', upright:r.upright!==false });
+      items.push({ name:r.name||'Коробка', l:+r.l, w:+r.w, h:+r.h, qty:+r.qty, weight:+r.weight||0, source:'manual', upright:r.upright!==false, noGoOnTop:r.noGoOnTop===true, noSupport:r.noSupport===true });
     }
   });
   return items;
@@ -1094,7 +1720,7 @@ document.getElementById('quickAddBtn').onclick = ()=>{
   const qty = Math.max(1, +document.getElementById('quickAddQty').value || 1);
   if(idx < 0) return;
   const c = CATALOG[idx];
-  currentLoadItems.push({ name:c.name, l:c.l, w:c.w, h:c.h, qty, weight:c.weight||0, source:'catalog', catalogIndex:idx, upright:true, _id: ++loadItemSeq, _colorIdx: currentLoadItems.length });
+  currentLoadItems.push({ name:c.name, l:c.l, w:c.w, h:c.h, qty, weight:c.weight||0, source:'catalog', catalogIndex:idx, upright:true, noGoOnTop:false, noSupport:false, _id: ++loadItemSeq, _colorIdx: currentLoadItems.length });
   recalcAndRender();
 };
 
@@ -1109,7 +1735,7 @@ document.getElementById('quickAddManualBtn').onclick = ()=>{
     document.getElementById('calcHint').textContent = 'Укажите длину, ширину и высоту для новой позиции.';
     return;
   }
-  currentLoadItems.push({ name, l, w, h, qty, weight, source:'manual', upright:true, _id: ++loadItemSeq, _colorIdx: currentLoadItems.length });
+  currentLoadItems.push({ name, l, w, h, qty, weight, source:'manual', upright:true, noGoOnTop:false, noSupport:false, _id: ++loadItemSeq, _colorIdx: currentLoadItems.length });
   recalcAndRender();
   ['quickAddName','quickAddL','quickAddW','quickAddH','quickAddWeight'].forEach(id=> document.getElementById(id).value='');
   document.getElementById('quickAddManualQty').value = 1;
@@ -1209,34 +1835,38 @@ function renderResults(results, items){
     reco = `<div class="reco">⚠️ Ни один выбранный вариант не вмещает весь груз целиком. Ближе всего — <b>${escapeHtml(best.vehicle.name)}</b>${unitsNote}: помещается ${best.totalPlaced} из ${best.totalRequested} шт. (${pct}%). Возможно, стоит увеличить количество единиц транспорта, выбрать больший транспорт или разбить груз на несколько рейсов.</div>`;
   }
 
-  wrap.innerHTML = reco + results.map(r=>{
+  wrap.innerHTML = reco + results.map((r, rIdx)=>{
     const unitsHtml = r.units.map((unit, uIdx)=>{
+      const svgId = `v${rIdx}u${uIdx}`;
       const rows = unit.placements.map(p=>`
         <tr>
           <td>${escapeHtml(p.item.name)}${p.unitWarning ? `<div style="color:var(--amber-dark);font-size:11.5px;font-weight:600;margin-top:2px;">⚠️ похоже на ошибку в размерах (проверьте, не в ${p.unitWarning} ли раз больше нужного)</div>` : ''}</td>
-          <td>${p.item.qty + p.placed}</td>
+          <td>${p.requested}</td>
           <td>${p.placed}</td>
-          <td class="mono">${p.ori? `${p.ori.fw}×${p.ori.fh}×${p.ori.depth} см` : '—'}</td>
-          <td class="mono">${p.ori? `${p.ori.nx}×${p.ori.ny} / слой` : '—'}</td>
-          <td class="mono">${p.ori? p.layersUsed : '—'}</td>
+          <td class="mono">${p.ori? `${p.ori.fw}×${p.ori.fh}×${p.ori.depth} см${p.oriMixed?' *':''}` : '—'}</td>
+          <td>${standsOnSummary(unit, p)}</td>
+          <td class="mono">${p.placed? Math.round(p.maxTop)+' см' : '—'}</td>
         </tr>`).join('');
+      const anyMixed = unit.placements.some(p=>p.oriMixed);
       return `
       <div class="fleet-unit">
         ${r.unitCount>1 ? `<div class="fleet-unit-title">Единица ${uIdx+1} из ${r.unitCount} · ${unit.totalPlaced} шт. · заполнение ${unit.utilization.toFixed(1)}% · свободно ${Math.round(unit.leftoverLength)} см</div>` : ''}
         <table class="res-table">
-          <thead><tr><th>Товар</th><th>В эту единицу</th><th>Размещено</th><th>Ориентация (Ш×В×Гл)</th><th>Шт. в слое</th><th>Слоёв</th></tr></thead>
+          <thead><tr><th>Товар</th><th>В эту единицу</th><th>Размещено</th><th>Ориентация (Ш×В×Гл)</th><th>На чём стоит</th><th>Верх стопки</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
+        ${anyMixed ? `<p class="note" style="margin:-8px 0 14px;">* часть коробок этой позиции лежит в другой ориентации — показана самая частая.</p>` : ''}
         <div class="viz-row">
-          <div class="viz-wrap">${renderVehicleSVG(unit)}</div>
+          <div class="viz-wrap">${renderVehicleSVG(unit, svgId)}</div>
           <div class="viz-legend">
-            <div class="viz-legend-title">Цвета на схеме</div>
+            <span class="viz-legend-title">Цвета на схеме</span>
             ${unit.placements.filter(p=>p.placed>0).map(p=>{
               const c = PALETTE[(p.item._colorIdx ?? 0) % PALETTE.length];
               return `<div class="viz-legend-row"><span class="viz-legend-swatch" style="background:${c.front}"></span><span>${escapeHtml(p.item.name)} <b>×${p.placed}</b></span></div>`;
             }).join('')}
             ${unit.leftoverLength>0.5 ? `<div class="viz-legend-row"><span class="viz-legend-swatch" style="background:#eee2ab;border:1px dashed #b98a1f;"></span><span>свободное место</span></div>` : ''}
           </div>
+          ${renderVizToolbar(unit, svgId)}
         </div>
       </div>`;
     }).join('');
@@ -1315,10 +1945,51 @@ function renderResults(results, items){
         ${r.totalWeight>0 ? `<div class="stat"><b>${r.totalWeight.toFixed(0)} кг</b><span>расчётный вес груза</span></div>` : ''}
       </div>
 
+      ${r.timedOut ? `<p class="note" style="color:var(--amber-dark);font-weight:600;">⚠️ Расчёт остановлен по времени — груза слишком много для полной раскладки. Часть коробок могла остаться неразмещённой не из-за нехватки места. Попробуйте посчитать позиции по отдельности.</p>` : ''}
       ${unfitHtml}
       ${unitsHtml}
     </div>`;
   }).join('');
+
+  wireVizHandlers();
+  document.querySelectorAll('.viz-tools-msg').forEach(el=> el.textContent = vizHint);
+}
+
+// Short human summary of what a product is resting on: the floor, or the products under it.
+function standsOnSummary(unit, p){
+  if(!p.boxes || !p.boxes.length) return '—';
+  const counts = new Map();
+  p.boxes.forEach(b=>{
+    const under = supportersOf(unit.space, b);
+    const names = [];
+    under.forEach(u=>{ if(names.indexOf(u.item.name) === -1) names.push(u.item.name); });
+    const key = names.length ? 'поверх «'+names.join('» + «')+'»' : 'пол';
+    counts.set(key, (counts.get(key)||0) + 1);
+  });
+  return [...counts.entries()]
+    .map(([k,n])=> escapeHtml(n === p.boxes.length ? k : `${k} ×${n}`))
+    .join('<br>');
+}
+
+// Controls for hand-arranging the load: what is selected and what can be done with it.
+function renderVizToolbar(unit, svgId){
+  const selected = vizSelection && vizSelection.svgId === svgId
+    ? unit.boxes.find(b=> b.id === vizSelection.boxId) : null;
+  const info = selected
+    ? `<b>${escapeHtml(selected.item.name)}</b> · ${selected.dz}×${selected.dy}×${selected.dx} см · от торца ${Math.round(selected.x)} см, от борта ${Math.round(selected.z)} см, от пола ${Math.round(selected.y)} см`
+    : 'Коробка не выбрана — щёлкните по любой на схеме.';
+  return `
+  <div class="viz-tools">
+    <div class="viz-tools-hint">Коробки можно двигать мышью — коробка сама садится на то, что под ней. Щелчок по коробке выделяет её.</div>
+    <div class="viz-tools-sel">${info}</div>
+    <div class="viz-tools-btns">
+      <button type="button" class="viz-btn" data-viz-act="rotate" ${selected?'':'disabled'}>Повернуть</button>
+      <button type="button" class="viz-btn" data-viz-act="floor" ${selected?'':'disabled'}>На пол</button>
+      <button type="button" class="viz-btn" data-viz-act="remove" ${selected?'':'disabled'}>Убрать из кузова</button>
+      <button type="button" class="viz-btn ghost" data-viz-act="repack">Пересчитать заново</button>
+    </div>
+    <div class="viz-tools-msg" id="vizHint"></div>
+  </div>`;
 }
 
 /* ========================= SAVE TO SHEET ========================= */
