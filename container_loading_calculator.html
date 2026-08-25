@@ -1332,48 +1332,61 @@ function renderVehicleSVG(result, svgId){
     svg += floorQuad(coveredLength, L, 0, W, '#eee2ab');
   }
 
-  // one cargo box
+  // One cargo box. The eye looks down the (1,1,1) diagonal here, so the three faces it can
+  // see are the ones meeting at the (x1, y1, z1) corner: the top, the far end and the near
+  // side. Drawing the z0 face instead — as this did before — filled the wrong third of the
+  // outline and left the lower-left third of every box see-through, which read as if boxes
+  // were cutting into each other.
   function cuboid(x0,x1,y0,y1,z0,z1,colors){
     const A_=projFull(x0,y1,z0), B_=projFull(x1,y1,z0), C_=projFull(x1,y1,z1), D_=projFull(x0,y1,z1);
-    const E_=projFull(x0,y0,z0), F_=projFull(x1,y0,z0), G_=projFull(x1,y0,z1);
+    const F_=projFull(x1,y0,z0), G_=projFull(x1,y0,z1), H_=projFull(x0,y0,z1);
     const pts = p=>p.map(v=>v.toFixed(1)).join(',');
     let out = '';
     out += `<polygon points="${pts(B_)} ${pts(C_)} ${pts(G_)} ${pts(F_)}" fill="${colors.side}" stroke="#16232a" stroke-width="0.6"/>`;
-    out += `<polygon points="${pts(A_)} ${pts(B_)} ${pts(F_)} ${pts(E_)}" fill="${colors.front}" stroke="#16232a" stroke-width="0.6"/>`;
+    out += `<polygon points="${pts(D_)} ${pts(C_)} ${pts(G_)} ${pts(H_)}" fill="${colors.front}" stroke="#16232a" stroke-width="0.6"/>`;
     out += `<polygon points="${pts(A_)} ${pts(B_)} ${pts(C_)} ${pts(D_)}" fill="${colors.top}" stroke="#16232a" stroke-width="0.6"/>`;
     return out;
   }
 
-  // ghost outline for the empty leftover volume at the tail of the body
-  function ghostBox(x0,x1){
+  // The empty volume left at the tail. The tinted fill goes down before the cargo so it never
+  // washes over boxes standing in front of it; the dashed outline and the caption go on top
+  // afterwards, otherwise a load reaching the far wall buries its own "свободно" label.
+  function ghostFill(x0,x1){
+    if(x1-x0 < 0.5) return '';
+    const cA=projFull(x0,H,0), cB=projFull(x1,H,0), cC=projFull(x1,H,W), cD=projFull(x0,H,W);
+    const pts = p=>p.map(v=>v.toFixed(1)).join(',');
+    return `<polygon points="${pts(cA)} ${pts(cB)} ${pts(cC)} ${pts(cD)}" fill="#f4e6ab" fill-opacity="0.3" stroke="none"/>`;
+  }
+  function ghostOutline(x0,x1){
     if(x1-x0 < 0.5) return '';
     const cA=projFull(x0,H,0), cB=projFull(x1,H,0), cC=projFull(x1,H,W), cD=projFull(x0,H,W);
     const cE=projFull(x0,0,0), cF=projFull(x1,0,0), cG=projFull(x1,0,W), cHh=projFull(x0,0,W);
-    const pts = p=>p.map(v=>v.toFixed(1)).join(',');
-    let out = `<polygon points="${pts(cA)} ${pts(cB)} ${pts(cC)} ${pts(cD)}" fill="#f4e6ab" fill-opacity="0.3" stroke="none"/>`;
+    let out = '';
     const edges = [[cA,cB],[cB,cC],[cC,cD],[cD,cA],[cE,cF],[cF,cG],[cG,cHh],[cHh,cE],[cA,cE],[cB,cF],[cC,cG],[cD,cHh]];
     edges.forEach(([p1,p2])=>{
       out += `<line x1="${p1[0].toFixed(1)}" y1="${p1[1].toFixed(1)}" x2="${p2[0].toFixed(1)}" y2="${p2[1].toFixed(1)}" stroke="#b98a1f" stroke-width="1" stroke-dasharray="4 3"/>`;
     });
+    const label = `своб. ${Math.round(x1-x0)} см`;
+    // keep the caption inside the canvas even when the free strip is a sliver at the far wall
     const mid = projFull((x0+x1)/2, H*0.66, W/2);
-    out += `<text x="${mid[0].toFixed(1)}" y="${mid[1].toFixed(1)}" font-size="13" fill="#8a651a" text-anchor="middle" font-weight="600">своб. ${Math.round(x1-x0)} см</text>`;
+    const lx = Math.max(marginL + 40, Math.min(viewW - marginR - 40, mid[0]));
+    out += `<text x="${lx.toFixed(1)}" y="${mid[1].toFixed(1)}" font-size="13" fill="#8a651a" text-anchor="middle" font-weight="600" paint-order="stroke" stroke="#fbfbfa" stroke-width="3.5" stroke-linejoin="round">${label}</text>`;
     return out;
   }
 
-  svg += ghostBox(coveredLength, L);
+  svg += ghostFill(coveredLength, L);
 
   const UNFIT_COLORS = { top:'#f0a898', front:'#dd6a52', side:'#b84a35' };
 
-  // Painter's algorithm: the camera looks at the +x end, the z=0 side and the top, so a box
-  // is nearer when x and y are larger and z is smaller. Sorting by (x0 + y0 - z1) ascending
-  // therefore draws the far ones first.
-  const drawn = boxes.slice().sort((a,b)=> (a.x + a.y - (a.z+a.dz)) - (b.x + b.y - (b.z+b.dz)));
+  const drawn = depthSort(boxes);
   const overflow = Math.max(0, drawn.length - MAX_BOXES_DRAWN);
   drawn.slice(0, MAX_BOXES_DRAWN).forEach(b=>{
     const colors = b.item._colorIdx === 'unfit' ? UNFIT_COLORS : PALETTE[(b.item._colorIdx ?? 0) % PALETTE.length];
     const selected = vizSelection && svgId && vizSelection.svgId === svgId && vizSelection.boxId === b.id;
     svg += `<g class="viz-box${selected?' selected':''}"${svgId?` data-box="${b.id}"`:''}>${cuboid(b.x, b.x+b.dx, b.y, b.y+b.dy, b.z, b.z+b.dz, colors)}</g>`;
   });
+
+  svg += ghostOutline(coveredLength, L);
 
   // axis: length ticks along the lowest edge (0,0,W)->(L,0,W), which runs outside the cargo —
   // on the (x,0,0) edge the numbers ended up printed over the boxes
@@ -1400,6 +1413,58 @@ function renderVehicleSVG(result, svgId){
 
   svg += `</svg>`;
   return svg;
+}
+
+// Painter's order for axis-aligned boxes. A box hides another when it lies entirely further
+// along x, y or z; boxes with no such relation never overlap on screen and can go in any
+// order. One sort key can't express that reliably once boxes differ a lot in shape — a long
+// thin scooter against a tall pallet is exactly the case that goes wrong — so the order is
+// resolved as a dependency graph and flattened.
+function depthSort(boxes){
+  const n = boxes.length;
+  const key = b => b.x + b.y + b.z;
+  if(n < 2) return boxes.slice();
+  if(n > 2000) return boxes.slice().sort((a, b)=> key(a) - key(b));
+
+  // screen extents, unscaled — enough to tell whether two boxes can overlap at all
+  const ext = boxes.map(b=>({
+    minX: b.x - (b.z + b.dz),  maxX: (b.x + b.dx) - b.z,
+    minY: 0.5*(b.x + b.z) - (b.y + b.dy),
+    maxY: 0.5*((b.x + b.dx) + (b.z + b.dz)) - b.y,
+  }));
+  const after = [], indeg = new Array(n).fill(0);
+  for(let i=0; i<n; i++) after.push([]);
+  for(let i=0; i<n; i++){
+    for(let j=i+1; j<n; j++){
+      if(ext[i].maxX <= ext[j].minX || ext[j].maxX <= ext[i].minX) continue;
+      if(ext[i].maxY <= ext[j].minY || ext[j].maxY <= ext[i].minY) continue;
+      const a = boxes[i], b = boxes[j];
+      if(b.x >= a.x+a.dx - PACK_EPS || b.y >= a.y+a.dy - PACK_EPS || b.z >= a.z+a.dz - PACK_EPS){
+        after[i].push(j); indeg[j]++;
+      } else if(a.x >= b.x+b.dx - PACK_EPS || a.y >= b.y+b.dy - PACK_EPS || a.z >= b.z+b.dz - PACK_EPS){
+        after[j].push(i); indeg[i]++;
+      }
+    }
+  }
+
+  const ready = [];
+  const push = i =>{
+    let lo = 0, hi = ready.length;
+    while(lo < hi){ const mid = (lo+hi) >> 1; if(key(boxes[ready[mid]]) <= key(boxes[i])) lo = mid+1; else hi = mid; }
+    ready.splice(lo, 0, i);
+  };
+  for(let i=0; i<n; i++) if(!indeg[i]) push(i);
+  const out = [], done = new Array(n).fill(false);
+  while(ready.length){
+    const i = ready.shift();
+    out.push(boxes[i]); done[i] = true;
+    after[i].forEach(j=>{ if(--indeg[j] === 0) push(j); });
+  }
+  // a cycle would mean overlapping boxes, which cannot happen here — but never drop any
+  if(out.length < n){
+    boxes.forEach((b, i)=>{ if(!done[i]) out.push(b); });
+  }
+  return out;
 }
 
 /* ========================= MANUAL RE-ARRANGING =========================
